@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+
+	<!-- Visit map: the natural terrain comes from the tile seed (same as the original settlement map),
+	     the town itself from the snapshot. Deliberately not based on MapCommonBase. -->
+	<MapGeneratorDef>
+		<defName>OA_OccupiedTown</defName>
+		<genSteps>
+			<li>ElevationFertility</li>
+			<li>Caves</li>
+			<li>RocksFromGrid</li>
+			<li>Terrain</li>
+			<li>CavesTerrain</li>
+			<li>Roads</li>
+			<li>RockChunks</li>
+			<li>OA_RestoreTown</li>
+			<li>Plants</li>
+			<li>Snow</li>
+			<li>Animals</li>
+		</genSteps>
+	</MapGeneratorDef>
+
+	<GenStepDef>
+		<defName>OA_RestoreTown</defName>
+		<order>400</order>
+		<genStep Class="OccupationAnnexation.GenStep_RestoreTown" />
+	</GenStepDef>
+
+	<!-- ============================ Town routine ============================ -->
+
+	<!-- Vanilla settlements have few workbenches: work also means mending battle damage, cleaning up,
+	     and tending barrels, generators and fires. -->
+	<DutyDef>
+		<defName>OA_TownWork</defName>
+		<thinkNode Class="ThinkNode_Priority">
+			<subNodes>
+				<li Class="ThinkNode_ConditionalRandom">
+					<chance>0.35</chance>
+					<subNodes>
+						<li Class="OccupationAnnexation.JobGiver_TownRepair" />
+					</subNodes>
+				</li>
+				<li Class="ThinkNode_ConditionalRandom">
+					<chance>0.3</chance>
+					<subNodes>
+						<li Class="OccupationAnnexation.JobGiver_TownClean" />
+					</subNodes>
+				</li>
+				<li Class="OccupationAnnexation.JobGiver_TownFakeWork" />
+				<li Class="OccupationAnnexation.JobGiver_TownRepair" />
+				<li Class="OccupationAnnexation.JobGiver_TownClean" />
+				<li Class="JobGiver_WanderNearDutyLocation">
+					<wanderRadius>10</wanderRadius>
+				</li>
+			</subNodes>
+		</thinkNode>
+	</DutyDef>
+
+	<DutyDef>
+		<defName>OA_TownFarm</defName>
+		<thinkNode Class="ThinkNode_Priority">
+			<subNodes>
+				<li Class="OccupationAnnexation.JobGiver_TownFakeFarm" />
+				<li Class="OccupationAnnexation.JobGiver_TownFakeWork" />
+				<li Class="JobGiver_WanderNearDutyLocation">
+					<wanderRadius>10</wanderRadius>
+				</li>
+			</subNodes>
+		</thinkNode>
+	</DutyDef>
+
+	<DutyDef>
+		<defName>OA_TownHaul</defName>
+		<thinkNode Class="ThinkNode_Priority">
+			<subNodes>
+				<li Class="OccupationAnnexation.JobGiver_TownHaul" />
+				<li Class="OccupationAnnexation.JobGiver_TownFakeWork" />
+				<li Class="JobGiver_WanderNearDutyLocation">
+					<wanderRadius>10</wanderRadius>
+				</li>
+			</subNodes>
+		</thinkNode>
+	</DutyDef>
+
+	<DutyDef>
+		<defName>OA_TownGuard</defName>
+		<alwaysShowWeapon>true</alwaysShowWeapon>
+		<thinkNode Class="ThinkNode_Priority">
+			<subNodes>
+				<li Class="JobGiver_AIDefendPoint">
+					<targetAcquireRadius>25</targetAcquireRadius>
+					<targetKeepRadius>30</targetKeepRadius>
+				</li>
+				<li Class="OccupationAnnexation.JobGiver_TownPatrol" />
+				<li Class="JobGiver_WanderNearDutyLocation">
+					<wanderRadius>12</wanderRadius>
+				</li>
+			</subNodes>
+		</thinkNode>
+	</DutyDef>
+
+	<DutyDef>
+		<defName>OA_TownLeisure</defName>
+		<thinkNode Class="ThinkNode_Priority">
+			<subNodes>
+				<li Class="ThinkNode_ConditionalRandom">
+					<chance>0.5</chance>
+					<subNodes>
+						<li Class="JobGiver_StandAndBeSociallyActive">
+							<ticksRange>600~1500</ticksRange>
+						</li>
+					</subNodes>
+				</li>
+				<li Class="JobGiver_WanderNearDutyLocation">
+					<wanderRadius>12</wanderRadius>
+				</li>
+			</subNodes>
+		</thinkNode>
+	</DutyDef>
+
+	<!-- Occupied, not yet annexed: sullen locals who mostly stand around. -->
+	<DutyDef>
+		<defName>OA_TownIdle</defName>
+		<thinkNode Class="ThinkNode_Priority">
+			<subNodes>
+				<li Class="ThinkNode_ConditionalRandom">
+					<chance>0.6</chance>
+					<subNodes>
+						<li Class="JobGiver_StandAndBeSociallyActive">
+							<ticksRange>900~2000</ticksRange>
+						</li>
+					</subNodes>
+				</li>
+				<li Class="JobGiver_WanderNearDutyLocation">
+					<wanderRadius>6</wanderRadius>
+				</li>
+			</subNodes>
+		</thinkNode>
+	</DutyDef>
+
+	<DutyDef>
+		<defName>OA_TownSleep</defName>
+		<thinkNode Class="ThinkNode_Priority">
+			<subNodes>
+				<li Class="OccupationAnnexation.JobGiver_TownSleep" />
+				<li Class="JobGiver_WanderNearDutyLocation">
+					<wanderRadius>6</wanderRadius>
+				</li>
+			</subNodes>
+		</thinkNode>
+	</DutyDef>
+
+	<JobDef>
+		<defName>OA_FakeWork</defName>
+		<driverClass>OccupationAnnexation.JobDriver_FakeWork</driverClass>
+		<reportString>working at TargetA.</reportString>
+		<casualInterruptible>true</casualInterruptible>
+	</JobDef>
+
+	<JobDef>
+		<defName>OA_FakeFarm</defName>
+		<driverClass>OccupationAnnexation.JobDriver_FakeFarm</driverClass>
+		<reportString>tending TargetA.</reportString>
+		<casualInterruptible>true</casualInterruptible>
+	</JobDef>
+
+	<JobDef>
+		<defName>OA_TownRepair</defName>
+		<driverClass>OccupationAnnexation.JobDriver_TownRepair</driverClass>
+		<reportString>repairing TargetA.</reportString>
+		<casualInterruptible>true</casualInterruptible>
+	</JobDef>
+
+	<JobDef>
+		<defName>OA_TownClean</defName>
+		<driverClass>OccupationAnnexation.JobDriver_TownClean</driverClass>
+		<reportString>cleaning.</reportString>
+		<casualInterruptible>true</casualInterruptible>
+	</JobDef>
+
+	<JobDef>
+		<defName>OA_Patrol</defName>
+		<driverClass>OccupationAnnexation.JobDriver_Patrol</driverClass>
+		<reportString>keeping watch.</reportString>
+		<alwaysShowWeapon>true</alwaysShowWeapon>
+		<casualInterruptible>true</casualInterruptible>
+	</JobDef>
+
+</Defs>

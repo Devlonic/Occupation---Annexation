@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+
+	<!-- ============ Налаштування ============ -->
+	<OA_SettingsCategory>Окупація та анексія</OA_SettingsCategory>
+	<OA_Settings_HeaderCapitulation>Капітуляція</OA_Settings_HeaderCapitulation>
+	<OA_Settings_EnableCapitulation>Ворожі поселення можуть капітулювати</OA_Settings_EnableCapitulation>
+	<OA_Settings_EnableCapitulation_Tip>Коли оборону ворожого поселення зламано, ті, хто вижив, кидають зброю й лягають, а поселення окуповується замість знищення.</OA_Settings_EnableCapitulation_Tip>
+	<OA_Settings_DisableFlee>Оборонці поселень не тікають</OA_Settings_DisableFlee>
+	<OA_Settings_DisableFlee_Tip>У ванілі оборонці тікають з мапи після великих втрат. З цією опцією вони тримаються, доки не зламається мораль, а потім здаються.</OA_Settings_DisableFlee_Tip>
+	<OA_Settings_MoraleThreshold>Мораль, за якої оборона ламається: {0}</OA_Settings_MoraleThreshold>
+	<OA_Settings_MoraleThreshold_Tip>Мораль падає від втрат, знищених турелей, загибелі командира, придушення (Combat Extended) і чисельної переваги нападників. Що вище значення, то раніше поселення здаються.</OA_Settings_MoraleThreshold_Tip>
+	<OA_Settings_MinDefenseLoss>Мінімальна частка знищеної оборони: {0}</OA_Settings_MinDefenseLoss>
+	<OA_Settings_MinDefenseLoss_Tip>Поселення не здається, доки не втратить щонайменше таку частку бойової сили.</OA_Settings_MinDefenseLoss_Tip>
+	<OA_Settings_MinCombatTime>Мінімальний час бою до капітуляції: {0}</OA_Settings_MinCombatTime>
+	<OA_Settings_HeaderOccupation>Окупація та анексія</OA_Settings_HeaderOccupation>
+	<OA_Settings_StartingLoyalty>Початкова лояльність окупованого міста: {0}</OA_Settings_StartingLoyalty>
+	<OA_Settings_AnnexThreshold>Лояльність, потрібна для анексії: {0}</OA_Settings_AnnexThreshold>
+	<OA_Settings_MinOccupationDays>Мінімум днів окупації до анексії: {0}</OA_Settings_MinOccupationDays>
+	<OA_Settings_HeaderEconomy>Економіка</OA_Settings_HeaderEconomy>
+	<OA_Settings_ProductionMultiplier>Множник виробництва: {0}</OA_Settings_ProductionMultiplier>
+	<OA_Settings_StockpileCap>Ліміт складу на мешканця (вартість у сріблі): {0}</OA_Settings_StockpileCap>
+	<OA_Settings_AllowPods>Індустріальні міста можуть доставляти дроп-подами</OA_Settings_AllowPods>
+	<OA_Settings_AllowPods_Tip>Міста індустріального рівня й вище можуть надсилати доставку дроп-подами: швидше, але вони падають туди, де є місце.</OA_Settings_AllowPods_Tip>
+	<OA_Settings_HeaderEvents>Події</OA_Settings_HeaderEvents>
+	<OA_Settings_EnableUprisings>Повстання в нелояльних містах</OA_Settings_EnableUprisings>
+	<OA_Settings_EnableRetake>Колишні власники намагаються відвоювати свої міста</OA_Settings_EnableRetake>
+	<OA_Settings_DebugLogging>Налагоджувальний лог</OA_Settings_DebugLogging>
+
+	<!-- ============ Капітуляція ============ -->
+	<OA_LetterCapitulationLabel>{0} капітулює</OA_LetterCapitulationLabel>
+	<OA_LetterCapitulation>Оборону {0} зламано. Решта оборонців {1} кидають зброю й лягають обличчям донизу: здалися {2} осіб.\n\nВони більше не битимуться. Декого можна взяти в полон, решта стане населенням міста після окупації.\n\nВбивство тих, хто здався, знизить лояльність міста.</OA_LetterCapitulation>
+	<OA_TakePrisoner>Взяти в полон: {0}</OA_TakePrisoner>
+	<OA_CannotTakePrisoner>Неможливо взяти в полон: {0}</OA_CannotTakePrisoner>
+	<OA_MessageTookPrisoner>{0} бере в полон: {1}.</OA_MessageTookPrisoner>
+
+	<!-- ============ Окупація ============ -->
+	<OA_ProtectorateName>Протекторат {0}</OA_ProtectorateName>
+	<OA_LetterOccupiedLabel>{0} окуповано</OA_LetterOccupiedLabel>
+	<OA_LetterOccupied>{0} впало, але його не зрівняють із землею: поселення фракції {1} тепер окуповане вашою колонією і передане під владу: {2}.\n\nКоли ваші люди підуть, ті, хто вижив, залишаться його населенням. Поки що їхня лояльність низька; вона зростає з часом, швидше з гарнізоном і низькими податками. Коли місто стане достатньо лояльним, його можна анексувати.\n\nУсе, що лишилося лежати в місті, потрапить на його склад.</OA_LetterOccupied>
+	<OA_LetterTownDesertedLabel>{0} спорожніло</OA_LetterTownDesertedLabel>
+	<OA_LetterTownDeserted>У {0} нікого не лишилося. Місто покинуте.</OA_LetterTownDeserted>
+	<OA_MessageLoyaltyLostFromStay>{0} втрачає {1} лояльності через те, як поводилися з його людьми.</OA_MessageLoyaltyLostFromStay>
+	<OA_LetterAnnexReadyLabel>{0} можна анексувати</OA_LetterAnnexReadyLabel>
+	<OA_LetterAnnexReady>Люди {0} звикли до вашої влади. Тепер місто можна анексувати.</OA_LetterAnnexReady>
+	<OA_LetterAnnexedLabel>{0} анексовано</OA_LetterAnnexedLabel>
+	<OA_LetterAnnexed>{0} тепер повноцінна частина: {1}. Його люди працюють на повну силу, а лояльність усталиться на рівні задоволення.</OA_LetterAnnexed>
+	<OA_AlreadyAnnexed>Вже анексовано.</OA_AlreadyAnnexed>
+	<OA_CannotAnnexWhileVisiting>Неможливо анексувати, поки в місті хтось є.</OA_CannotAnnexWhileVisiting>
+	<OA_AnnexNeedsLoyalty>Потрібна лояльність {0} (зараз {1}).</OA_AnnexNeedsLoyalty>
+	<OA_AnnexNeedsDays>Потрібно {0} днів окупації (зараз {1}).</OA_AnnexNeedsDays>
+
+	<!-- ============ Місто на світовій мапі ============ -->
+	<OA_InspectStateOccupied>Окуповане {0} дн.</OA_InspectStateOccupied>
+	<OA_InspectStateAnnexed>Анексоване</OA_InspectStateAnnexed>
+	<OA_InspectLoyalty>Лояльність: {0} ({1})</OA_InspectLoyalty>
+	<OA_InspectCanAnnex>Готове до анексії.</OA_InspectCanAnnex>
+	<OA_InspectPopulation>Населення: {0} (працює {1}), гарнізон: {2}</OA_InspectPopulation>
+	<OA_InspectStockpile>Склад: {0} з {1}</OA_InspectStockpile>
+	<OA_InspectTax>Податок: {0}</OA_InspectTax>
+	<OA_InspectProfile>Ремесла: {0}</OA_InspectProfile>
+	<OA_InspectRetakeIncoming>{0} нападе через {1}!</OA_InspectRetakeIncoming>
+
+	<OA_Loyalty_Rebellious>бунтівна</OA_Loyalty_Rebellious>
+	<OA_Loyalty_Resentful>ворожа</OA_Loyalty_Resentful>
+	<OA_Loyalty_Compliant>покірна</OA_Loyalty_Compliant>
+	<OA_Loyalty_Loyal>лояльна</OA_Loyalty_Loyal>
+	<OA_Loyalty_Devoted>віддана</OA_Loyalty_Devoted>
+
+	<OA_Tax_Low>низький</OA_Tax_Low>
+	<OA_Tax_Normal>звичайний</OA_Tax_Normal>
+	<OA_Tax_High>високий</OA_Tax_High>
+	<OA_TaxDescription>виробництво {0}, лояльність {1} на день</OA_TaxDescription>
+
+	<OA_CommandAnnex>Анексувати</OA_CommandAnnex>
+	<OA_CommandAnnexDesc>Зробити місто повноцінною частиною протекторату. Анексовані міста виробляють удвічі більше, а їхня лояльність усталюється на рівні задоволення.</OA_CommandAnnexDesc>
+	<OA_CommandTax>Податок: {0}</OA_CommandTax>
+	<OA_CommandTaxDesc>Високі податки швидше наповнюють склад, але щодня знижують лояльність; низькі податки привертають місто на ваш бік.</OA_CommandTaxDesc>
+	<OA_CommandRequestDelivery>Запросити доставку</OA_CommandRequestDelivery>
+	<OA_CommandRequestDeliveryDesc>Виберіть товари зі складу. Мешканці привезуть їх у колонію з в'ючними тваринами (або дроп-подами, якщо можуть).</OA_CommandRequestDeliveryDesc>
+	<OA_CommandWithdrawGarrison>Відкликати гарнізон</OA_CommandWithdrawGarrison>
+	<OA_CommandWithdrawGarrisonDesc>Колоністи, що стоять тут гарнізоном, формують караван.</OA_CommandWithdrawGarrisonDesc>
+	<OA_CommandAbandon>Покинути місто</OA_CommandAbandon>
+	<OA_CommandAbandonDesc>Відмовитися від міста. Гарнізон іде караваном; люди й склад лишаються напризволяще.</OA_CommandAbandonDesc>
+	<OA_ConfirmAbandon>Справді покинути {0}? Це не можна скасувати.</OA_ConfirmAbandon>
+	<OA_LetterAbandonedLabel>{0} покинуто</OA_LetterAbandonedLabel>
+	<OA_LetterAbandoned>Ви відмовилися від {0}. Воно більше не входить до протекторату.</OA_LetterAbandoned>
+	<OA_CommandEnterTown>Увійти в місто</OA_CommandEnterTown>
+	<OA_CommandEnterTownDesc>Відвідати {0}. Можна пройтися містом, поговорити з місцевими й забрати товари зі складу.</OA_CommandEnterTownDesc>
+	<OA_CommandTakeStock>Забрати зі складу</OA_CommandTakeStock>
+	<OA_CommandTakeStockDesc>Завантажити товари зі складу міста в цей караван.</OA_CommandTakeStockDesc>
+	<OA_CommandGift>Подарувати</OA_CommandGift>
+	<OA_CommandGiftDesc>Залишити місту товари з каравану. Подарунки підвищують лояльність.</OA_CommandGiftDesc>
+	<OA_CommandStationGarrison>Залишити гарнізон</OA_CommandStationGarrison>
+	<OA_CommandStationGarrisonDesc>Залишити колоніста в місті. Гарнізон щодня підвищує лояльність і допомагає проти повстань і нападів.</OA_CommandStationGarrisonDesc>
+	<OA_GarrisonNeedsOneLeft>Хоча б один колоніст має лишитися з караваном.</OA_GarrisonNeedsOneLeft>
+	<OA_MessageGarrisonStationed>{0} залишається в {1} у складі гарнізону.</OA_MessageGarrisonStationed>
+	<OA_CannotWhileVisiting>Не можна, поки в місті хтось є.</OA_CannotWhileVisiting>
+	<OA_StockpileEmpty>Склад порожній.</OA_StockpileEmpty>
+	<OA_NoHomeMap>У вас немає колонії, куди доставляти.</OA_NoHomeMap>
+	<OA_MessageStockpileFull>Склад {0} заповнений. Заберіть товари або запросіть доставку.</OA_MessageStockpileFull>
+	<OA_VisitTown>Відвідати {0}</OA_VisitTown>
+	<OA_MessageEnteredTown>{0} увійшов у {1}.</OA_MessageEnteredTown>
+	<OA_MessageLocalKilled>Ваші люди вбили мешканця {0}: лояльність -{1}.</OA_MessageLocalKilled>
+
+	<OA_TabTown>Місто</OA_TabTown>
+	<OA_TabTownVisiting>Зараз у місті хтось є: його люди й товари на мапі.</OA_TabTownVisiting>
+	<OA_TabPopulation>Населення ({0})</OA_TabPopulation>
+	<OA_TabGarrison>Гарнізон ({0})</OA_TabGarrison>
+	<OA_TabStockpile>Склад: {0} з {1}</OA_TabStockpile>
+
+	<!-- ============ Діалог складу та доставка ============ -->
+	<OA_DialogTakeTitle>Забрати товари з {0}</OA_DialogTakeTitle>
+	<OA_DialogGiftTitle>Подарунки для {0}</OA_DialogGiftTitle>
+	<OA_DialogDeliveryTitle>Доставка з {0} до {1}</OA_DialogDeliveryTitle>
+	<OA_StockCountTip>Скільки є на складі міста.</OA_StockCountTip>
+	<OA_CaravanCountTip>Скільки везе караван.</OA_CaravanCountTip>
+	<OA_GiftLoyaltyPreview>Приріст лояльності: +{0}</OA_GiftLoyaltyPreview>
+	<OA_DeliveryByPods>Надіслати дроп-подами</OA_DeliveryByPods>
+	<OA_DeliveryEta>Прибуде приблизно через {0}.</OA_DeliveryEta>
+	<OA_ButtonTake>Забрати</OA_ButtonTake>
+	<OA_ButtonGift>Подарувати</OA_ButtonGift>
+	<OA_ButtonSend>Надіслати</OA_ButtonSend>
+	<OA_NothingSelected>Нічого не вибрано.</OA_NothingSelected>
+	<OA_MessageGiftAccepted>{0} з вдячністю приймає подарунки: лояльність +{1}.</OA_MessageGiftAccepted>
+	<OA_MessageDeliveryDispatched>{0} надсилає товари до {1}. Вони прибудуть приблизно через {2}.</OA_MessageDeliveryDispatched>
+	<OA_LetterDeliveryLabel>Доставка з {0}</OA_LetterDeliveryLabel>
+	<OA_LetterDelivery>Прибули товари, які ви запросили з {0}:\n\n{1}</OA_LetterDelivery>
+
+	<!-- ============ Життя міста ============ -->
+	<OA_ReportFakeWorkRecipe>працює: {0}.</OA_ReportFakeWorkRecipe>
+
+	<!-- ============ Події ============ -->
+	<OA_LetterUprisingSuppressedLabel>Повстання в {0} придушено</OA_LetterUprisingSuppressedLabel>
+	<OA_LetterUprisingSuppressed>Невдоволені мешканці {0} повстали проти вашої влади, але гарнізон придушив повстання. Загинуло бунтівників: {1}.\n\nЛояльність досі низька: знизьте податки або надішліть подарунки.</OA_LetterUprisingSuppressed>
+	<OA_LetterUprisingLabel>{0} повстає</OA_LetterUprisingLabel>
+	<OA_LetterUprising>Люди {0} не витримали й скинули вашу владу. Тепер місто на боці: {1}. Склад втрачено; гарнізон, якщо був, утік караваном.</OA_LetterUprising>
+	<OA_LetterRetakeWarningLabel>Загроза для {0}</OA_LetterRetakeWarningLabel>
+	<OA_LetterRetakeWarning>Розвідники доповідають: {1} збирає сили, щоб відвоювати {0}. Напад станеться приблизно через {2}.\n\nЗалиште там гарнізон або будьте в місті зі своїми людьми, щоб відбити напад самостійно.</OA_LetterRetakeWarning>
+	<OA_LetterRetakeRepelledLabel>{0} вистояло</OA_LetterRetakeRepelledLabel>
+	<OA_LetterRetakeRepelled>{1} атакувала {0}, але оборонці вистояли. Лояльність людей до вас зросла.</OA_LetterRetakeRepelled>
+	<OA_LetterRetakeLostLabel>{0} втрачено</OA_LetterRetakeLostLabel>
+	<OA_LetterRetakeLost>{1} відвоювала {0}. Склад втрачено; гарнізон, якщо був, утік караваном.</OA_LetterRetakeLost>
+
+</LanguageData>

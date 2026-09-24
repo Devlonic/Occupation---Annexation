@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+
+	<!-- The single, permanently allied faction that owns every conquered town. Created the first time a town is occupied. -->
+	<FactionDef ParentName="OutlanderFactionBase">
+		<defName>OA_Protectorate</defName>
+		<label>protectorate</label>
+		<description>Towns your colony conquered and chose to rule rather than raze. The townsfolk come from many former factions; what binds them now is your protection and your taxes.</description>
+		<pawnSingular>townsman</pawnSingular>
+		<pawnsPlural>townsfolk</pawnsPlural>
+		<leaderTitle>governor</leaderTitle>
+		<colorSpectrum>
+			<li>(0.85, 0.72, 0.30)</li>
+			<li>(0.95, 0.85, 0.45)</li>
+		</colorSpectrum>
+		<classicIdeo>true</classicIdeo>
+		<requiredCountAtGameStart>0</requiredCountAtGameStart>
+		<maxConfigurableAtWorldCreation>0</maxConfigurableAtWorldCreation>
+		<canMakeRandomly>false</canMakeRandomly>
+		<settlementGenerationWeight>0</settlementGenerationWeight>
+		<displayInFactionSelection>false</displayInFactionSelection>
+		<canSiege>false</canSiege>
+		<canStageAttacks>false</canStageAttacks>
+		<listOrderPriority>35</listOrderPriority>
+	</FactionDef>
+
+	<WorldObjectDef>
+		<defName>OA_OccupiedSettlement</defName>
+		<label>protectorate town</label>
+		<description>A town conquered by your colony. It keeps living on its own, pays taxes into its stockpile and can be visited.</description>
+		<worldObjectClass>OccupationAnnexation.OccupiedSettlement</worldObjectClass>
+		<texture>World/WorldObjects/DefaultSettlement</texture>
+		<expandingIcon>true</expandingIcon>
+		<expandingIconPriority>10</expandingIconPriority>
+		<canHaveFaction>true</canHaveFaction>
+		<mapGenerator>OA_OccupiedTown</mapGenerator>
+		<inspectorTabs>
+			<li>OccupationAnnexation.WITab_Town</li>
+		</inspectorTabs>
+		<comps>
+			<li Class="WorldObjectCompProperties_FormCaravan" />
+		</comps>
+	</WorldObjectDef>
+
+</Defs>

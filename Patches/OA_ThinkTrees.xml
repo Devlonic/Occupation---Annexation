@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Patch>
+
+	<!-- Surrendered pawns lie face down; the mental state sits above lord duties and the constant think tree. -->
+	<Operation Class="PatchOperationAdd">
+		<xpath>Defs/ThinkTreeDef[defName="MentalStateCritical"]/thinkRoot/subNodes</xpath>
+		<value>
+			<li Class="ThinkNode_ConditionalMentalState">
+				<state>OA_Surrendered</state>
+				<subNodes>
+					<li Class="OccupationAnnexation.JobGiver_Surrendered" />
+				</subNodes>
+			</li>
+		</value>
+	</Operation>
+
+</Patch>

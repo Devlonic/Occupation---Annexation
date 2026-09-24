@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Defs>
+
+	<MentalStateDef ParentName="BaseMentalState">
+		<defName>OA_Surrendered</defName>
+		<label>surrendered</label>
+		<stateClass>OccupationAnnexation.MentalState_Surrendered</stateClass>
+		<category>Misc</category>
+		<nameColor>(0.85, 0.85, 0.85)</nameColor>
+		<recoveryMessage>{0} is no longer surrendering.</recoveryMessage>
+		<baseInspectLine>Surrendered: lying face down, unarmed</baseInspectLine>
+		<blockNormalThoughts>true</blockNormalThoughts>
+		<blockRandomInteraction>true</blockRandomInteraction>
+		<inCaravanCanDo>true</inCaravanCanDo>
+		<downedCanDo>true</downedCanDo>
+		<recoverFromDowned>false</recoverFromDowned>
+		<recoverFromCaptured>true</recoverFromCaptured>
+		<recoverFromCollapsingExhausted>false</recoverFromCollapsingExhausted>
+		<prisonersCanDo>false</prisonersCanDo>
+		<allowGuilty>true</allowGuilty>
+		<minTicksBeforeRecovery>99999999</minTicksBeforeRecovery>
+		<maxTicksBeforeRecovery>99999999</maxTicksBeforeRecovery>
+		<recoveryMtbDays>99999</recoveryMtbDays>
+	</MentalStateDef>
+
+	<JobDef>
+		<defName>OA_Surrender</defName>
+		<driverClass>OccupationAnnexation.JobDriver_Surrendered</driverClass>
+		<reportString>lying face down, surrendered.</reportString>
+		<alwaysShowReport>true</alwaysShowReport>
+		<casualInterruptible>false</casualInterruptible>
+		<suspendable>false</suspendable>
+	</JobDef>
+
+	<JobDef>
+		<defName>OA_TakeSurrenderedPrisoner</defName>
+		<driverClass>OccupationAnnexation.JobDriver_TakeSurrenderedPrisoner</driverClass>
+		<reportString>taking TargetA prisoner.</reportString>
+		<casualInterruptible>false</casualInterruptible>
+	</JobDef>
+
+	<DutyDef>
+		<defName>OA_Capitulated</defName>
+		<threatDisabled>true</threatDisabled>
+		<thinkNode Class="ThinkNode_Priority">
+			<subNodes>
+				<li Class="OccupationAnnexation.JobGiver_Surrendered" />
+			</subNodes>
+		</thinkNode>
+	</DutyDef>
+
+</Defs>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+	<OA_Taxes.label>податки</OA_Taxes.label>
+	<OA_Farming.label>землеробство</OA_Farming.label>
+	<OA_Kitchen.label>провізія</OA_Kitchen.label>
+	<OA_Smithing.label>ремесло</OA_Smithing.label>
+	<OA_Textiles.label>текстиль</OA_Textiles.label>
+	<OA_Luxuries.label>пивоваріння й зілля</OA_Luxuries.label>
+	<OA_Medicine.label>медицина</OA_Medicine.label>
+	<OA_Stonework.label>каменярство й видобуток</OA_Stonework.label>
+	<OA_Fuel.label>пальне</OA_Fuel.label>
+</LanguageData>

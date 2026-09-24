@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+	<OA_Surrendered.label>здався</OA_Surrendered.label>
+	<OA_Surrendered.recoveryMessage>{0} більше не здається.</OA_Surrendered.recoveryMessage>
+	<OA_Surrendered.baseInspectLine>Здався: лежить обличчям донизу, беззбройний</OA_Surrendered.baseInspectLine>
+</LanguageData>

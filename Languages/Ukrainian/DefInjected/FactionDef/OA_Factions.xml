@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+	<OA_Protectorate.label>протекторат</OA_Protectorate.label>
+	<OA_Protectorate.description>Міста, які ваша колонія завоювала і вирішила не руйнувати, а правити ними. Мешканці походять із різних колишніх фракцій; тепер їх об'єднують ваш захист і ваші податки.</OA_Protectorate.description>
+	<OA_Protectorate.pawnSingular>містянин</OA_Protectorate.pawnSingular>
+	<OA_Protectorate.pawnsPlural>містяни</OA_Protectorate.pawnsPlural>
+	<OA_Protectorate.leaderTitle>губернатор</OA_Protectorate.leaderTitle>
+</LanguageData>

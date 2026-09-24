@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+
+	<!-- ============ Settings ============ -->
+	<OA_SettingsCategory>Occupation &amp; Annexation</OA_SettingsCategory>
+	<OA_Settings_HeaderCapitulation>Capitulation</OA_Settings_HeaderCapitulation>
+	<OA_Settings_EnableCapitulation>Enemy settlements can capitulate</OA_Settings_EnableCapitulation>
+	<OA_Settings_EnableCapitulation_Tip>When the defense of a hostile settlement you assault is broken, the survivors drop their weapons and lie down, and the settlement is occupied instead of destroyed.</OA_Settings_EnableCapitulation_Tip>
+	<OA_Settings_DisableFlee>Settlement defenders do not flee</OA_Settings_DisableFlee>
+	<OA_Settings_DisableFlee_Tip>Vanilla defenders run off the map after heavy losses. With this on, they hold out until their morale breaks and then surrender.</OA_Settings_DisableFlee_Tip>
+	<OA_Settings_MoraleThreshold>Morale that breaks the defense: {0}</OA_Settings_MoraleThreshold>
+	<OA_Settings_MoraleThreshold_Tip>Morale falls with lost defenders, destroyed turrets, a fallen commander, suppression (Combat Extended) and being outnumbered. Higher values make settlements surrender sooner.</OA_Settings_MoraleThreshold_Tip>
+	<OA_Settings_MinDefenseLoss>Minimum share of the defense destroyed: {0}</OA_Settings_MinDefenseLoss>
+	<OA_Settings_MinDefenseLoss_Tip>Settlements never surrender before losing at least this share of their fighting strength.</OA_Settings_MinDefenseLoss_Tip>
+	<OA_Settings_MinCombatTime>Minimum fighting before surrender: {0}</OA_Settings_MinCombatTime>
+	<OA_Settings_HeaderOccupation>Occupation and annexation</OA_Settings_HeaderOccupation>
+	<OA_Settings_StartingLoyalty>Starting loyalty of an occupied town: {0}</OA_Settings_StartingLoyalty>
+	<OA_Settings_AnnexThreshold>Loyalty needed to annex: {0}</OA_Settings_AnnexThreshold>
+	<OA_Settings_MinOccupationDays>Minimum days of occupation before annexing: {0}</OA_Settings_MinOccupationDays>
+	<OA_Settings_HeaderEconomy>Economy</OA_Settings_HeaderEconomy>
+	<OA_Settings_ProductionMultiplier>Production multiplier: {0}</OA_Settings_ProductionMultiplier>
+	<OA_Settings_StockpileCap>Stockpile limit per inhabitant (silver value): {0}</OA_Settings_StockpileCap>
+	<OA_Settings_AllowPods>Industrial towns may deliver by drop pod</OA_Settings_AllowPods>
+	<OA_Settings_AllowPods_Tip>Towns of industrial or higher technology can send deliveries by drop pod: faster, but they land wherever there is room.</OA_Settings_AllowPods_Tip>
+	<OA_Settings_HeaderEvents>Events</OA_Settings_HeaderEvents>
+	<OA_Settings_EnableUprisings>Uprisings in disloyal towns</OA_Settings_EnableUprisings>
+	<OA_Settings_EnableRetake>Former owners try to retake their towns</OA_Settings_EnableRetake>
+	<OA_Settings_DebugLogging>Debug logging</OA_Settings_DebugLogging>
+
+	<!-- ============ Capitulation ============ -->
+	<OA_LetterCapitulationLabel>{0} capitulates</OA_LetterCapitulationLabel>
+	<OA_LetterCapitulation>The defense of {0} is broken. The remaining defenders of {1} throw down their weapons and lie face down: {2} people have surrendered.\n\nThey will not fight anymore. You can take some of them prisoner; the rest become the population of the town once it is occupied.\n\nKilling those who surrendered will cost the town's loyalty.</OA_LetterCapitulation>
+	<OA_TakePrisoner>Take {0} prisoner</OA_TakePrisoner>
+	<OA_CannotTakePrisoner>Cannot take {0} prisoner</OA_CannotTakePrisoner>
+	<OA_MessageTookPrisoner>{0} took {1} prisoner.</OA_MessageTookPrisoner>
+
+	<!-- ============ Occupation ============ -->
+	<OA_ProtectorateName>Protectorate of {0}</OA_ProtectorateName>
+	<OA_LetterOccupiedLabel>{0} occupied</OA_LetterOccupiedLabel>
+	<OA_LetterOccupied>{0} has fallen, but it will not be razed: the settlement of {1} is now occupied by your colony and placed under the rule of the {2}.\n\nWhen your people leave, the survivors stay behind as its population. Their loyalty is low for now; it grows over time, faster with a garrison and low taxes. Once the town is loyal enough, you can annex it.\n\nEverything left lying around the town goes into its stockpile.</OA_LetterOccupied>
+	<OA_LetterTownDesertedLabel>{0} deserted</OA_LetterTownDesertedLabel>
+	<OA_LetterTownDeserted>Nobody is left in {0}. The town has been abandoned.</OA_LetterTownDeserted>
+	<OA_MessageLoyaltyLostFromStay>{0} lost {1} loyalty over how its people were treated.</OA_MessageLoyaltyLostFromStay>
+	<OA_LetterAnnexReadyLabel>{0} can be annexed</OA_LetterAnnexReadyLabel>
+	<OA_LetterAnnexReady>The people of {0} have grown used to your rule. You can now annex the town.</OA_LetterAnnexReady>
+	<OA_LetterAnnexedLabel>{0} annexed</OA_LetterAnnexedLabel>
+	<OA_LetterAnnexed>{0} is now a full part of the {1}. Its people work at full strength, and its loyalty will settle at a content level.</OA_LetterAnnexed>
+	<OA_AlreadyAnnexed>Already annexed.</OA_AlreadyAnnexed>
+	<OA_CannotAnnexWhileVisiting>Cannot annex while someone is in the town.</OA_CannotAnnexWhileVisiting>
+	<OA_AnnexNeedsLoyalty>Needs loyalty {0} (now {1}).</OA_AnnexNeedsLoyalty>
+	<OA_AnnexNeedsDays>Needs {0} days of occupation (now {1}).</OA_AnnexNeedsDays>
+
+	<!-- ============ Town world object ============ -->
+	<OA_InspectStateOccupied>Occupied for {0} days</OA_InspectStateOccupied>
+	<OA_InspectStateAnnexed>Annexed</OA_InspectStateAnnexed>
+	<OA_InspectLoyalty>Loyalty: {0} ({1})</OA_InspectLoyalty>
+	<OA_InspectCanAnnex>Ready to be annexed.</OA_InspectCanAnnex>
+	<OA_InspectPopulation>Population: {0} ({1} working), garrison: {2}</OA_InspectPopulation>
+	<OA_InspectStockpile>Stockpile: {0} of {1}</OA_InspectStockpile>
+	<OA_InspectTax>Tax: {0}</OA_InspectTax>
+	<OA_InspectProfile>Trades: {0}</OA_InspectProfile>
+	<OA_InspectRetakeIncoming>{0} will attack in {1}!</OA_InspectRetakeIncoming>
+
+	<OA_Loyalty_Rebellious>rebellious</OA_Loyalty_Rebellious>
+	<OA_Loyalty_Resentful>resentful</OA_Loyalty_Resentful>
+	<OA_Loyalty_Compliant>compliant</OA_Loyalty_Compliant>
+	<OA_Loyalty_Loyal>loyal</OA_Loyalty_Loyal>
+	<OA_Loyalty_Devoted>devoted</OA_Loyalty_Devoted>
+
+	<OA_Tax_Low>low</OA_Tax_Low>
+	<OA_Tax_Normal>normal</OA_Tax_Normal>
+	<OA_Tax_High>high</OA_Tax_High>
+	<OA_TaxDescription>output {0}, loyalty {1} per day</OA_TaxDescription>
+
+	<OA_CommandAnnex>Annex</OA_CommandAnnex>
+	<OA_CommandAnnexDesc>Make this town a full part of your protectorate. Annexed towns produce twice as much and their loyalty settles at a content level.</OA_CommandAnnexDesc>
+	<OA_CommandTax>Tax: {0}</OA_CommandTax>
+	<OA_CommandTaxDesc>Higher taxes fill the stockpile faster but cost loyalty every day; low taxes win the town over.</OA_CommandTaxDesc>
+	<OA_CommandRequestDelivery>Request delivery</OA_CommandRequestDelivery>
+	<OA_CommandRequestDeliveryDesc>Choose goods from the stockpile. The townsfolk bring them to your colony with pack animals (or by drop pod, if they can).</OA_CommandRequestDeliveryDesc>
+	<OA_CommandWithdrawGarrison>Withdraw garrison</OA_CommandWithdrawGarrison>
+	<OA_CommandWithdrawGarrisonDesc>The colonists stationed here form a caravan.</OA_CommandWithdrawGarrisonDesc>
+	<OA_CommandAbandon>Abandon town</OA_CommandAbandon>
+	<OA_CommandAbandonDesc>Give up this town. The garrison leaves as a caravan; the people and the stockpile are left to their fate.</OA_CommandAbandonDesc>
+	<OA_ConfirmAbandon>Really abandon {0}? This cannot be undone.</OA_ConfirmAbandon>
+	<OA_LetterAbandonedLabel>{0} abandoned</OA_LetterAbandonedLabel>
+	<OA_LetterAbandoned>You gave up {0}. It is no longer part of your protectorate.</OA_LetterAbandoned>
+	<OA_CommandEnterTown>Enter town</OA_CommandEnterTown>
+	<OA_CommandEnterTownDesc>Visit {0}. You can walk around, talk to the locals and take goods from the stockpile.</OA_CommandEnterTownDesc>
+	<OA_CommandTakeStock>Take from stockpile</OA_CommandTakeStock>
+	<OA_CommandTakeStockDesc>Load goods from the town's stockpile into this caravan.</OA_CommandTakeStockDesc>
+	<OA_CommandGift>Give gifts</OA_CommandGift>
+	<OA_CommandGiftDesc>Leave goods from the caravan to the town. Gifts raise its loyalty.</OA_CommandGiftDesc>
+	<OA_CommandStationGarrison>Station garrison</OA_CommandStationGarrison>
+	<OA_CommandStationGarrisonDesc>Leave a colonist in the town. A garrison raises loyalty every day and helps against uprisings and attacks.</OA_CommandStationGarrisonDesc>
+	<OA_GarrisonNeedsOneLeft>At least one colonist has to stay with the caravan.</OA_GarrisonNeedsOneLeft>
+	<OA_MessageGarrisonStationed>{0} stays in {1} as part of the garrison.</OA_MessageGarrisonStationed>
+	<OA_CannotWhileVisiting>Not while someone is in the town.</OA_CannotWhileVisiting>
+	<OA_StockpileEmpty>The stockpile is empty.</OA_StockpileEmpty>
+	<OA_NoHomeMap>You have no colony to deliver to.</OA_NoHomeMap>
+	<OA_MessageStockpileFull>The stockpile of {0} is full. Collect it or request a delivery.</OA_MessageStockpileFull>
+	<OA_VisitTown>Visit {0}</OA_VisitTown>
+	<OA_MessageEnteredTown>{0} entered {1}.</OA_MessageEnteredTown>
+	<OA_MessageLocalKilled>A local of {0} was killed by your people: loyalty -{1}.</OA_MessageLocalKilled>
+
+	<OA_TabTown>Town</OA_TabTown>
+	<OA_TabTownVisiting>Someone is in the town right now: its people and goods are on the map.</OA_TabTownVisiting>
+	<OA_TabPopulation>Population ({0})</OA_TabPopulation>
+	<OA_TabGarrison>Garrison ({0})</OA_TabGarrison>
+	<OA_TabStockpile>Stockpile: {0} of {1}</OA_TabStockpile>
+
+	<!-- ============ Stockpile dialog and deliveries ============ -->
+	<OA_DialogTakeTitle>Take goods from {0}</OA_DialogTakeTitle>
+	<OA_DialogGiftTitle>Give gifts to {0}</OA_DialogGiftTitle>
+	<OA_DialogDeliveryTitle>Deliver goods from {0} to {1}</OA_DialogDeliveryTitle>
+	<OA_StockCountTip>How many are in the town's stockpile.</OA_StockCountTip>
+	<OA_CaravanCountTip>How many the caravan carries.</OA_CaravanCountTip>
+	<OA_GiftLoyaltyPreview>Loyalty gained: +{0}</OA_GiftLoyaltyPreview>
+	<OA_DeliveryByPods>Send by drop pod</OA_DeliveryByPods>
+	<OA_DeliveryEta>Arrives in about {0}.</OA_DeliveryEta>
+	<OA_ButtonTake>Take</OA_ButtonTake>
+	<OA_ButtonGift>Give</OA_ButtonGift>
+	<OA_ButtonSend>Send</OA_ButtonSend>
+	<OA_NothingSelected>Nothing selected.</OA_NothingSelected>
+	<OA_MessageGiftAccepted>{0} gratefully accepts your gifts: loyalty +{1}.</OA_MessageGiftAccepted>
+	<OA_MessageDeliveryDispatched>{0} sends goods to {1}. They should arrive in about {2}.</OA_MessageDeliveryDispatched>
+	<OA_LetterDeliveryLabel>Delivery from {0}</OA_LetterDeliveryLabel>
+	<OA_LetterDelivery>The goods you requested from {0} have arrived:\n\n{1}</OA_LetterDelivery>
+
+	<!-- ============ Town life ============ -->
+	<OA_ReportFakeWorkRecipe>working: {0}.</OA_ReportFakeWorkRecipe>
+
+	<!-- ============ Events ============ -->
+	<OA_LetterUprisingSuppressedLabel>Uprising in {0} suppressed</OA_LetterUprisingSuppressedLabel>
+	<OA_LetterUprisingSuppressed>Disgruntled people of {0} rose up against your rule, but the garrison put the uprising down. {1} rebels died.\n\nLoyalty is still low: consider lowering taxes or sending gifts.</OA_LetterUprisingSuppressed>
+	<OA_LetterUprisingLabel>{0} rebels</OA_LetterUprisingLabel>
+	<OA_LetterUprising>The people of {0} have had enough and threw off your rule. The town now sides with {1}. Its stockpile is lost; any garrison fled as a caravan.</OA_LetterUprising>
+	<OA_LetterRetakeWarningLabel>{0} under threat</OA_LetterRetakeWarningLabel>
+	<OA_LetterRetakeWarning>Scouts report that {1} is gathering forces to take {0} back. The attack will come in about {2}.\n\nStation a garrison there, or be in the town with your people to fight them off yourself.</OA_LetterRetakeWarning>
+	<OA_LetterRetakeRepelledLabel>{0} holds</OA_LetterRetakeRepelledLabel>
+	<OA_LetterRetakeRepelled>{1} attacked {0}, but the defenders held. The people's loyalty to you has grown.</OA_LetterRetakeRepelled>
+	<OA_LetterRetakeLostLabel>{0} lost</OA_LetterRetakeLostLabel>
+	<OA_LetterRetakeLost>{1} has taken {0} back. The stockpile is lost; any garrison fled as a caravan.</OA_LetterRetakeLost>
+
+</LanguageData>
