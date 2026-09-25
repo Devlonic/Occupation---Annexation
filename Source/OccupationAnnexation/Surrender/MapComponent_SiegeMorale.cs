@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.Linq;
 using RimWorld;
+using Verse.AI.Group;
 using RimWorld.Planet;
 using UnityEngine;
 using Verse;
@@ -30,6 +32,15 @@ namespace OccupationAnnexation
         public int surrenderedKilled;
         public int prisonersTaken;
 
+        /// <summary>
+        /// Everyone who laid down arms here. Vanilla clears mental states when a downed pawn gets back up
+        /// (and in a few other cases), so the surrender is re-applied from this list.
+        /// </summary>
+        public HashSet<Pawn> capitulatedPawns = new HashSet<Pawn>();
+
+        /// <summary>Saves from before the list existed get it rebuilt once.</summary>
+        private bool capitulatedListBuilt;
+
         private readonly List<Pawn> tmpDefenders = new List<Pawn>();
 
         public MapComponent_SiegeMorale(Map map) : base(map)
@@ -50,15 +61,27 @@ namespace OccupationAnnexation
             Scribe_Values.Look(ref lastMorale, "lastMorale", 1f);
             Scribe_Values.Look(ref surrenderedKilled, "surrenderedKilled", 0);
             Scribe_Values.Look(ref prisonersTaken, "prisonersTaken", 0);
+            Scribe_Collections.Look(ref capitulatedPawns, "capitulatedPawns", LookMode.Reference);
+            Scribe_Values.Look(ref capitulatedListBuilt, "capitulatedListBuilt", false);
+            if (Scribe.mode == LoadSaveMode.PostLoadInit)
+            {
+                capitulatedPawns ??= new HashSet<Pawn>();
+                capitulatedPawns.RemoveWhere(p => p == null);
+            }
         }
 
         public override void MapComponentTick()
         {
-            if (capitulated || !OAMod.Settings.enableCapitulation)
+            if ((Find.TickManager.TicksGame + map.uniqueID) % EvaluateInterval != 0)
             {
                 return;
             }
-            if ((Find.TickManager.TicksGame + map.uniqueID) % EvaluateInterval != 0)
+            if (capitulated)
+            {
+                MaintainSurrender();
+                return;
+            }
+            if (!OAMod.Settings.enableCapitulation)
             {
                 return;
             }
@@ -163,6 +186,69 @@ namespace OccupationAnnexation
                 + $"combat time {(now - engagementStartTick).ToStringTicksToPeriod()}";
 
             return (enoughTime && brokenMorale) || almostNobodyLeft;
+        }
+
+        /// <summary>
+        /// Puts back into surrender anyone who got up or otherwise lost the surrendered state.
+        /// </summary>
+        public void MaintainSurrender()
+        {
+            if (!capitulatedListBuilt)
+            {
+                RebuildCapitulatedList();
+            }
+            if (capitulatedPawns.Count == 0)
+            {
+                return;
+            }
+            foreach (Pawn pawn in capitulatedPawns.ToList())
+            {
+                if (!StillCapitulated(pawn))
+                {
+                    capitulatedPawns.Remove(pawn);
+                    continue;
+                }
+                if (!pawn.Downed && (!SurrenderUtility.IsSurrendered(pawn) || !(pawn.GetLord()?.LordJob is LordJob_Capitulated)))
+                {
+                    SurrenderUtility.Resurrender(pawn);
+                }
+            }
+        }
+
+        /// <summary>
+        /// A town occupied with an older version has no list: every free person of the defeated faction
+        /// on its map took part in the capitulation.
+        /// </summary>
+        public void MarkCapitulatedListBuilt()
+        {
+            capitulatedListBuilt = true;
+        }
+
+        private void RebuildCapitulatedList()
+        {
+            capitulatedListBuilt = true;
+            if (capitulatedPawns.Count > 0 || !(map.Parent is OccupiedSettlement town) || town.originalFaction == null)
+            {
+                return;
+            }
+            foreach (Pawn pawn in map.mapPawns.SpawnedPawnsInFaction(town.originalFaction))
+            {
+                if (pawn.RaceProps.Humanlike && StillCapitulated(pawn))
+                {
+                    capitulatedPawns.Add(pawn);
+                }
+            }
+            if (capitulatedPawns.Count > 0)
+            {
+                OAMod.DebugLog($"Rebuilt the capitulation list of {map}: {capitulatedPawns.Count} pawns.");
+            }
+        }
+
+        public bool StillCapitulated(Pawn pawn)
+        {
+            return pawn != null && !pawn.Dead && !pawn.Destroyed && pawn.Spawned && pawn.Map == map
+                && !pawn.IsPrisoner && !pawn.IsSlave && pawn.Faction != null && !pawn.Faction.IsPlayer
+                && pawn.Faction.HostileTo(Faction.OfPlayer);
         }
 
         public List<Pawn> ActiveDefenders(Faction faction)

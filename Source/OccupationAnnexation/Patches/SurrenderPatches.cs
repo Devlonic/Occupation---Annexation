@@ -73,6 +73,22 @@ namespace OccupationAnnexation
         }
     }
 
+    /// <summary>
+    /// Getting back up (MakeUndowned) clears the mind, including the surrendered mental state.
+    /// A pawn who had capitulated lies back down right away.
+    /// </summary>
+    [HarmonyPatch(typeof(Pawn_HealthTracker), "MakeUndowned")]
+    public static class Patch_Pawn_HealthTracker_MakeUndowned
+    {
+        public static void Postfix(Pawn ___pawn)
+        {
+            if (___pawn != null && ___pawn.Spawned && !___pawn.Downed && SurrenderUtility.HasCapitulated(___pawn))
+            {
+                SurrenderUtility.Resurrender(___pawn);
+            }
+        }
+    }
+
     [HarmonyPatch(typeof(Pawn), nameof(Pawn.Kill))]
     public static class Patch_Pawn_Kill
     {

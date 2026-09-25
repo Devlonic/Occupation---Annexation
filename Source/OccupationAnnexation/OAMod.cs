@@ -6,7 +6,7 @@ namespace OccupationAnnexation
 {
     public class OAMod : Mod
     {
-        public const string HarmonyId = "tmine.OccupationAnnexation";
+        public const string HarmonyId = "devloner.OccupationAnnexation";
 
         public static OASettings Settings;
 

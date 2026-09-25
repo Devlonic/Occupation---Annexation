@@ -70,7 +70,7 @@ The game locks the DLL while running; close it before rebuilding.
 ### Dev-mode tools
 
 - **Debug actions**, category *Occupation & Annexation*: *Force capitulation*,
-  *Log siege morale*.
+  *Log siege morale*, *Log hostile threats* (what keeps "Reform caravan" disabled).
 - **Town gizmos** with *Show dev gizmos* on: loyalty ±20, pass a day, produce 10 days,
   trigger uprising, trigger retake attempt.
 

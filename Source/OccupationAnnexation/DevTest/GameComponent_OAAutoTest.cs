@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using RimWorld;
+using HarmonyLib;
 using RimWorld.Planet;
 using Verse;
 using Verse.AI;
@@ -200,6 +202,7 @@ namespace OccupationAnnexation
                         MapComponent_SiegeMorale morale = target.Map.GetComponent<MapComponent_SiegeMorale>();
                         if (morale.initialized)
                         {
+                            TrySpawnPlayerVehicle(target.Map);
                             Note($"Settlement map ready: {morale.baselineDefenders} defenders, power {morale.baselinePower:F0}, turrets {morale.baselineTurrets}");
                             Check(morale.baselineDefenders > 0, "settlement has defenders");
                             Next(2);
@@ -258,6 +261,9 @@ namespace OccupationAnnexation
                     break;
                 case 17:
                     TestGarrisonAndGifts();
+                    break;
+                case 18:
+                    TestGettingUp();
                     break;
                 case 20:
                     // Driven from GameComponentUpdate.
@@ -376,6 +382,7 @@ namespace OccupationAnnexation
             int foreignTurrets = map.listerBuildings.allBuildingsNonColonist.Count(b => b is Building_Turret && b.Faction == original);
             Check(foreignTurrets == 0, "no turrets left for the defeated faction");
             Note($"Profile: {town.profile.Select(p => p.def.defName + " " + p.share.ToString("F2")).ToCommaList()}; rect {town.townRect}");
+            CheckReformGizmos(map, "after occupation");
             Next(4);
         }
 
@@ -395,7 +402,7 @@ namespace OccupationAnnexation
                 if (prisonerTarget == null || captor == null)
                 {
                     Note("Nobody to take prisoner (or no capable colonist); skipping");
-                    Next(5);
+                    Next(18);
                     return;
                 }
                 Note($"Captor {captor.LabelShort} (health {captor.health.summaryHealth.SummaryHealthPercent:P0}, drafted {captor.Drafted}, job {captor.CurJobDef?.defName}) -> {prisonerTarget.LabelShort} at distance {captor.Position.DistanceTo(prisonerTarget.Position):F0}, reachable {captor.CanReach(prisonerTarget, PathEndMode.Touch, Danger.Deadly)}, reservable {captor.CanReserve(prisonerTarget)}");
@@ -419,14 +426,15 @@ namespace OccupationAnnexation
             }
             if (prisonerTarget.IsPrisonerOfColony)
             {
+                CheckReformGizmos(map, "after taking a prisoner");
                 Check(true, "surrendered pawn became a prisoner");
                 Check(!SurrenderUtility.IsSurrendered(prisonerTarget), "prisoner no longer in the surrendered state");
-                Next(5);
+                Next(18);
             }
             else if (StepTicks > 12000)
             {
                 Fail("Taking a prisoner did not complete");
-                Next(5);
+                Next(18);
             }
         }
 
@@ -673,6 +681,84 @@ namespace OccupationAnnexation
             Next(17);
         }
 
+        /// <summary>
+        /// Vanilla clears the mind of a pawn that stops being downed. A capitulated pawn must stay surrendered.
+        /// </summary>
+        private void TestGettingUp()
+        {
+            Map map = town.Map;
+            MapComponent_SiegeMorale morale = map.GetComponent<MapComponent_SiegeMorale>();
+            Pawn pawn = morale.capitulatedPawns.FirstOrDefault(p => morale.StillCapitulated(p) && p.Downed)
+                ?? morale.capitulatedPawns.FirstOrDefault(p => morale.StillCapitulated(p));
+            if (pawn == null)
+            {
+                Note("No capitulated pawn left to test getting up; skipping");
+                Next(5);
+                return;
+            }
+            if (!pawn.Downed)
+            {
+                HealthUtility.DamageUntilDowned(pawn, allowBleedingWounds: false);
+            }
+            Check(pawn.Downed, $"test pawn {pawn.LabelShort} is downed");
+            pawn.health.RemoveAllHediffs();
+            Check(!pawn.Downed, "downed capitulated pawn got back up");
+            Check(SurrenderUtility.IsSurrendered(pawn), "the pawn that got up surrendered again");
+            Check(pawn.ThreatDisabled(null), "the pawn that got up is not a threat");
+            Check(pawn.GetLord()?.LordJob is LordJob_Capitulated, "the pawn that got up is back in the capitulated lord");
+
+            // Other ways the surrendered state can be lost are caught by the periodic check.
+            pawn.mindState.mentalStateHandler.Reset();
+            morale.MaintainSurrender();
+            Check(SurrenderUtility.IsSurrendered(pawn), "a lost surrender is restored by the periodic check");
+
+            // The real chain behind "there are still enemies here": a capitulated pawn goes down later (bleeding out),
+            // vanilla drops it from its lord, then it gets back up and vanilla clears its mind.
+            Pawn other = morale.capitulatedPawns.FirstOrDefault(p => p != pawn && morale.StillCapitulated(p));
+            if (other != null)
+            {
+                if (other.Downed)
+                {
+                    other.health.RemoveAllHediffs();
+                }
+                HealthUtility.DamageUntilDowned(other, allowBleedingWounds: false);
+                Check(other.Downed && other.GetLord()?.LordJob is LordJob_Capitulated, "a pawn that goes down after capitulating stays in the capitulated lord");
+
+                // Control: the old behaviour (dropped from the lord, no MakeUndowned patch) makes it an enemy again.
+                MethodInfo makeUndowned = AccessTools.Method(typeof(Pawn_HealthTracker), "MakeUndowned");
+                MethodInfo postfix = AccessTools.Method(typeof(Patch_Pawn_HealthTracker_MakeUndowned), "Postfix");
+                var harmony = new Harmony(OAMod.HarmonyId);
+                harmony.Unpatch(makeUndowned, postfix);
+                try
+                {
+                    other.GetLord()?.RemovePawn(other);
+                    other.health.RemoveAllHediffs();
+                    bool threat = GenHostility.IsActiveThreatToPlayer(other);
+                    Note($"Control without the patch: {other.LabelShort} downed {other.Downed}, surrendered {SurrenderUtility.IsSurrendered(other)}, active threat {threat}");
+                    Check(!SurrenderUtility.IsSurrendered(other) && threat, "control: vanilla makes a recovered pawn an enemy again");
+                    morale.MaintainSurrender();
+                    Check(SurrenderUtility.IsSurrendered(other) && !GenHostility.IsActiveThreatToPlayer(other) && other.GetLord()?.LordJob is LordJob_Capitulated,
+                        "control: the periodic check restores the surrender and the capitulated lord");
+                }
+                finally
+                {
+                    harmony.Patch(makeUndowned, postfix: new HarmonyMethod(postfix));
+                }
+            }
+
+            // Saves made before the capitulation list existed: the list is rebuilt from the defeated faction's people.
+            int listed = morale.capitulatedPawns.Count;
+            morale.capitulatedPawns.Clear();
+            Traverse.Create(morale).Field("capitulatedListBuilt").SetValue(false);
+            pawn.mindState.mentalStateHandler.Reset();
+            morale.MaintainSurrender();
+            Check(morale.capitulatedPawns.Count > 0 && morale.capitulatedPawns.Contains(pawn), $"old saves: capitulation list rebuilt ({morale.capitulatedPawns.Count}, was {listed})");
+            Check(SurrenderUtility.IsSurrendered(pawn), "old saves: pawns that lost the surrender lie down again");
+
+            CheckReformGizmos(map, "after a downed pawn got up");
+            Next(5);
+        }
+
         private void TestGarrisonAndGifts()
         {
             if (caravan == null || caravan.Destroyed)
@@ -793,6 +879,71 @@ namespace OccupationAnnexation
                     Next(7);
                     return;
             }
+        }
+
+        // ------------------------------------------------------------------ Vehicle Framework
+
+        private static readonly Type VehiclePawnType = AccessTools.TypeByName("Vehicles.VehiclePawn");
+
+        private void TrySpawnPlayerVehicle(Map map)
+        {
+            if (VehiclePawnType == null)
+            {
+                return;
+            }
+            try
+            {
+                Type defType = AccessTools.TypeByName("Vehicles.VehicleDef");
+                Def def = GenDefDatabase.GetDefSilentFail(defType, "VVE_BangBus") ?? GenDefDatabase.GetAllDefsInDatabaseForDef(defType).FirstOrDefault();
+                MethodInfo generate = AccessTools.Method(AccessTools.TypeByName("Vehicles.VehicleSpawner"), "GenerateVehicle", new[] { defType, typeof(Faction) });
+                var vehicle = (Pawn)generate.Invoke(null, new object[] { def, Faction.OfPlayer });
+                Pawn colonist = map.mapPawns.FreeColonistsSpawned.First();
+                IntVec3 cell = CellFinder.RandomClosewalkCellNear(colonist.Position, map, 8, c => c.Standable(map));
+                GenSpawn.Spawn(vehicle, cell, map, Rot4.North);
+                Note($"Spawned player vehicle {vehicle.LabelShort} ({def.defName}) at {cell}");
+            }
+            catch (Exception e)
+            {
+                Fail("Could not spawn a player vehicle: " + e);
+            }
+        }
+
+        /// <summary>
+        /// Vanilla "Reform caravan" and Vehicle Framework's "Reform vehicle caravan" must both be usable once the town is taken.
+        /// </summary>
+        private void CheckReformGizmos(Map map, string when)
+        {
+            bool vanillaThreat = GenHostility.AnyHostileActiveThreatToPlayer(map, countDormantPawnsAsHostile: true);
+            bool defaultThreat = GenHostility.AnyHostileActiveThreatTo(map, Faction.OfPlayer, out IAttackTarget threat);
+            Note($"Threats {when}: vanilla check {vanillaThreat}, default check {defaultThreat}, first threat {threat?.Thing?.ToString() ?? "none"} ({threat?.Thing?.Faction?.Name})");
+            int listed = 0;
+            foreach (IAttackTarget target in map.attackTargetsCache.TargetsHostileToFaction(Faction.OfPlayer))
+            {
+                if (listed++ >= 25)
+                {
+                    break;
+                }
+                Thing thing = target.Thing;
+                Note($"  hostile target {thing} [{thing.GetType().Name}] faction {thing.Faction?.Name}, active threat {GenHostility.IsActiveThreatTo(target, Faction.OfPlayer)}, threat disabled {target.ThreatDisabled(null)}, surrendered {thing is Pawn p && SurrenderUtility.IsSurrendered(p)}, downed {(thing as Pawn)?.Downed}");
+            }
+            FormCaravanComp comp = map.Parent.GetComponent<FormCaravanComp>();
+            if (comp == null)
+            {
+                Fail("the town has no FormCaravanComp");
+                return;
+            }
+            foreach (Gizmo gizmo in comp.GetGizmos())
+            {
+                if (gizmo is Command command)
+                {
+                    Note($"  caravan gizmo '{command.defaultLabel}' disabled {command.Disabled} {command.disabledReason}");
+                    if (VehiclePawnType != null && command.defaultLabel == "VF_CommandReformVehicleCaravan".Translate())
+                    {
+                        Check(!command.Disabled, $"Reform vehicle caravan is available {when}");
+                    }
+                }
+            }
+            Check(!vanillaThreat && !defaultThreat, $"no active threats {when}");
         }
 
         // ------------------------------------------------------------------ reporting

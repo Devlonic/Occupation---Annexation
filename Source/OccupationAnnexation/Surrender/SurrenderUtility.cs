@@ -79,6 +79,7 @@ namespace OccupationAnnexation
             }
             morale.capitulated = true;
             morale.capitulationTick = Find.TickManager.TicksGame;
+            morale.MarkCapitulatedListBuilt();
 
             List<Pawn> survivors = map.mapPawns.SpawnedPawnsInFaction(faction).Where(p => IsDefenderOf(p, faction)).ToList();
             var surrendered = new List<Pawn>();
@@ -93,6 +94,7 @@ namespace OccupationAnnexation
             foreach (Pawn pawn in surrendered)
             {
                 pawn.GetLord()?.RemovePawn(pawn);
+                morale.capitulatedPawns.Add(pawn);
             }
             if (surrendered.Count > 0)
             {
@@ -107,6 +109,42 @@ namespace OccupationAnnexation
                 new LookTargets(surrendered),
                 faction);
             OAMod.DebugLog($"{settlementLabel} capitulated, {surrendered.Count} pawns surrendered.");
+        }
+
+        /// <summary>
+        /// Whether this pawn laid down arms on its map and has not been taken prisoner since.
+        /// </summary>
+        public static bool HasCapitulated(Pawn pawn)
+        {
+            MapComponent_SiegeMorale morale = pawn?.MapHeld?.GetComponent<MapComponent_SiegeMorale>();
+            return morale != null && morale.capitulatedPawns.Contains(pawn) && morale.StillCapitulated(pawn);
+        }
+
+        /// <summary>
+        /// Puts a pawn that had capitulated back into the surrendered state and the capitulated lord.
+        /// </summary>
+        public static void Resurrender(Pawn pawn)
+        {
+            if (!TrySurrender(pawn) && !IsSurrendered(pawn))
+            {
+                return;
+            }
+            Lord lord = pawn.GetLord();
+            if (lord?.LordJob is LordJob_Capitulated)
+            {
+                return;
+            }
+            lord?.RemovePawn(pawn);
+            Lord capitulated = pawn.Map.lordManager.lords.FirstOrDefault(l => l.faction == pawn.Faction && l.LordJob is LordJob_Capitulated);
+            if (capitulated != null)
+            {
+                capitulated.AddPawn(pawn);
+            }
+            else
+            {
+                LordMaker.MakeNewLord(pawn.Faction, new LordJob_Capitulated(), pawn.Map, new[] { pawn });
+            }
+            OAMod.DebugLog($"{pawn} got up and surrendered again.");
         }
 
         /// <summary>

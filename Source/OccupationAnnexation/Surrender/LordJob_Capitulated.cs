@@ -14,6 +14,15 @@ namespace OccupationAnnexation
 
         public override bool CanBlockHostileVisitors => false;
 
+        /// <summary>
+        /// Vanilla drops pawns from their lord when they go down. A capitulated pawn who bleeds out and later
+        /// gets back up would then have neither the surrender nor the threat-disabled duty: an enemy again.
+        /// </summary>
+        public override bool ShouldRemovePawn(Pawn p, PawnLostCondition reason)
+        {
+            return reason != PawnLostCondition.Incapped;
+        }
+
         public override StateGraph CreateGraph()
         {
             var graph = new StateGraph();
