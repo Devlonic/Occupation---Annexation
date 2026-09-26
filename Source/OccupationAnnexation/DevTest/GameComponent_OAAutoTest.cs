@@ -383,6 +383,7 @@ namespace OccupationAnnexation
             Check(foreignTurrets == 0, "no turrets left for the defeated faction");
             Note($"Profile: {town.profile.Select(p => p.def.defName + " " + p.share.ToString("F2")).ToCommaList()}; rect {town.townRect}");
             CheckReformGizmos(map, "after occupation");
+            TestShowEnemyGizmo(map);
             Next(4);
         }
 
@@ -684,6 +685,23 @@ namespace OccupationAnnexation
         /// <summary>
         /// Vanilla clears the mind of a pawn that stops being downed. A capitulated pawn must stay surrendered.
         /// </summary>
+        /// <summary>
+        /// A leftover enemy (like Real Ruins' hostile ruin animals) is listed by the town's "enemies left" gizmo.
+        /// </summary>
+        private void TestShowEnemyGizmo(Map map)
+        {
+            string label = "OA_CommandShowEnemy".Translate(1);
+            Check(!town.GetGizmos().OfType<Command>().Any(c => c.defaultLabel == label), "no 'enemies left' gizmo without enemies");
+            Pawn fox = PawnGenerator.GeneratePawn(PawnKindDef.Named("Fox_Red"), Faction.OfAncientsHostile);
+            IntVec3 cell = CellFinder.RandomClosewalkCellNear(map.Center, map, 20);
+            GenSpawn.Spawn(fox, cell, map);
+            List<Thing> enemies = OccupiedSettlement.RemainingEnemies(map);
+            Check(enemies.Contains(fox), "a hostile ruin animal counts as a remaining enemy");
+            Check(town.GetGizmos().OfType<Command>().Any(c => c.defaultLabel == label), "'enemies left' gizmo appears");
+            fox.Destroy();
+            Check(OccupiedSettlement.RemainingEnemies(map).Count == 0 && !town.GetGizmos().OfType<Command>().Any(c => c.defaultLabel == label), "'enemies left' gizmo disappears");
+        }
+
         private void TestGettingUp()
         {
             Map map = town.Map;

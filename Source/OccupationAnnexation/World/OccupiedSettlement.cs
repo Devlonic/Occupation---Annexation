@@ -38,6 +38,7 @@ namespace OccupationAnnexation
         private static readonly Texture2D GarrisonRemoveIcon = ContentFinder<Texture2D>.Get("UI/Commands/RemoveFromCaravan");
         private static readonly Texture2D AbandonIcon = ContentFinder<Texture2D>.Get("UI/Commands/AbandonHome");
         private static readonly Texture2D EnterIcon = ContentFinder<Texture2D>.Get("UI/Commands/ShowMap");
+        private static readonly Texture2D EnemyIcon = ContentFinder<Texture2D>.Get("UI/Commands/Attack");
 
         public OccupationState state = OccupationState.Occupied;
         private string nameInt;
@@ -448,6 +449,30 @@ namespace OccupationAnnexation
                 };
             }
 
+            // Leaving is blocked while any enemy remains (vanilla only hides its button); show who it is.
+            if (HasMap)
+            {
+                List<Thing> enemies = RemainingEnemies(Map);
+                if (enemies.Count > 0)
+                {
+                    int next = 0;
+                    yield return new Command_Action
+                    {
+                        defaultLabel = "OA_CommandShowEnemy".Translate(enemies.Count),
+                        defaultDesc = "OA_CommandShowEnemyDesc".Translate(enemies.Take(5).Select(t => t.LabelCap.ToString()).ToCommaList()),
+                        icon = EnemyIcon,
+                        action = () =>
+                        {
+                            List<Thing> current = RemainingEnemies(Map);
+                            if (current.Count > 0)
+                            {
+                                CameraJumper.TryJumpAndSelect(current[next++ % current.Count]);
+                            }
+                        }
+                    };
+                }
+            }
+
             if (HasMap && state == OccupationState.Occupied && visits == 0)
             {
                 yield return SettleInExistingMapUtility.SettleCommand(Map, requiresNoEnemies: false);
@@ -579,6 +604,20 @@ namespace OccupationAnnexation
                 garrison.Disable("OA_GarrisonNeedsOneLeft".Translate());
             }
             yield return garrison;
+        }
+
+        /// <summary>Everything on the town map that keeps a caravan from reforming.</summary>
+        public static List<Thing> RemainingEnemies(Map map)
+        {
+            var result = new List<Thing>();
+            foreach (Verse.AI.IAttackTarget target in map.attackTargetsCache.TargetsHostileToFaction(Faction.OfPlayer))
+            {
+                if (GenHostility.IsActiveThreatToPlayer(target))
+                {
+                    result.Add(target.Thing);
+                }
+            }
+            return result;
         }
 
         // ------------------------------------------------------------------ garrison and abandoning

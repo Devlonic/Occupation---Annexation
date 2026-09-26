@@ -85,6 +85,8 @@
 	<OA_ConfirmAbandon>Really abandon {0}? This cannot be undone.</OA_ConfirmAbandon>
 	<OA_LetterAbandonedLabel>{0} abandoned</OA_LetterAbandonedLabel>
 	<OA_LetterAbandoned>You gave up {0}. It is no longer part of your protectorate.</OA_LetterAbandoned>
+	<OA_CommandShowEnemy>Enemies left: {0}</OA_CommandShowEnemy>
+	<OA_CommandShowEnemyDesc>A caravan cannot be reformed here while enemies remain on the map. Click to jump to the next one.\n\n{0}</OA_CommandShowEnemyDesc>
 	<OA_CommandEnterTown>Enter town</OA_CommandEnterTown>
 	<OA_CommandEnterTownDesc>Visit {0}. You can walk around, talk to the locals and take goods from the stockpile.</OA_CommandEnterTownDesc>
 	<OA_CommandTakeStock>Take from stockpile</OA_CommandTakeStock>

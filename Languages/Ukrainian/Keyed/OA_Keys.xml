@@ -85,6 +85,8 @@
 	<OA_ConfirmAbandon>Справді покинути {0}? Це не можна скасувати.</OA_ConfirmAbandon>
 	<OA_LetterAbandonedLabel>{0} покинуто</OA_LetterAbandonedLabel>
 	<OA_LetterAbandoned>Ви відмовилися від {0}. Воно більше не входить до протекторату.</OA_LetterAbandoned>
+	<OA_CommandShowEnemy>Ворогів лишилось: {0}</OA_CommandShowEnemy>
+	<OA_CommandShowEnemyDesc>Поки на мапі є вороги, караван звідси не сформувати. Натисніть, щоб перейти до наступного.\n\n{0}</OA_CommandShowEnemyDesc>
 	<OA_CommandEnterTown>Увійти в місто</OA_CommandEnterTown>
 	<OA_CommandEnterTownDesc>Відвідати {0}. Можна пройтися містом, поговорити з місцевими й забрати товари зі складу.</OA_CommandEnterTownDesc>
 	<OA_CommandTakeStock>Забрати зі складу</OA_CommandTakeStock>
