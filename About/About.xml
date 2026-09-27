@@ -3,12 +3,30 @@
 	<name>Occupation &amp; Annexation</name>
 	<author>Devloner</author>
 	<packageId>devloner.OccupationAnnexation</packageId>
+	<modVersion>1.0.0</modVersion>
+	<url>https://github.com/Devlonic/Occupation---Annexation</url>
 	<supportedVersions>
 		<li>1.5</li>
 	</supportedVersions>
-	<description>Enemy settlements no longer have to be wiped out. Break their main defense and the survivors capitulate: they drop their weapons and lie down. Occupy the settlement, raise its loyalty and annex it as an autonomous protectorate that produces goods. Collect the stockpile by caravan or request a delivery, and visit your towns to see the locals at work.
+	<description>Enemy settlements no longer have to be wiped out. Break their defense and the survivors capitulate: they drop their weapons and lie face down. Occupy the town, win its loyalty, annex it into your Protectorate, collect what it produces and visit it.
 
-Optional integration with Combat Extended (suppression affects morale) and CAI 5000 (surrendered pawns are left alone).</description>
+Capitulation
+- Defender morale breaks from losses, destroyed turrets, a fallen commander, suppression (Combat Extended) and being outnumbered.
+- Those who surrendered are no threat. Right-click one to take them prisoner.
+- When the shooting stops, their medics carry the wounded into beds and tend them. Shoot at them and they lie back down.
+- Your doctors can tend them too, and the town will remember it. Killing them upsets your colonists (according to their ideoligion) and costs goodwill with other factions.
+
+Towns
+- Occupied towns grow loyal over time, faster with a garrison, low taxes and gifts. Annex them once they are ready.
+- Towns produce goods from their workshops and fields; build more during a visit to change what they make.
+- Take goods by caravan, or have them delivered by pack animals or drop pods.
+- Visit a town: it is rebuilt as you left it, and the locals work, repair, patrol and sleep on a daily routine.
+- Loyal towns attract newcomers until their beds are full; annexed towns send volunteers to your colony.
+- Train a militia against the former owners' attempts to retake the town. Disloyal towns may rise up.
+
+Requires Harmony. Optional support for Combat Extended and CAI 5000. Safe to add to an existing save; not safe to remove. English and Ukrainian.
+
+This mod was created using an LLM, so please keep that in mind if you use it.</description>
 	<modDependencies>
 		<li>
 			<packageId>brrainz.harmony</packageId>

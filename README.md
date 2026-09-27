@@ -118,9 +118,31 @@ dotnet build -c Release                                  # outputs to 1.5/Assemb
 ```
 
 The mod folder is linked into the game with a directory junction:
-`RimWorld\Mods\OccupationAnnexation -> D:\Development\rimworld`.
+`RimWorld\Mods\OccupationAnnexation -> D:\Development\Occupation & Annexation`.
 
 The game locks the DLL while running; close it before rebuilding.
+
+### Publishing to the Steam Workshop
+
+RimWorld uploads the whole mod folder, including `.git` and `Source`, so upload a clean
+copy instead. `Tools\Build-Release.ps1` builds the DLL and copies only what the game loads
+(`About`, `1.5`, `Defs`, `Languages`, `Patches`, `LoadFolders.xml`) to
+`Release\OccupationAnnexation`, which git ignores.
+
+1. Close RimWorld and run `.\Tools\Build-Release.ps1 -LinkForUpload`. It points the game's
+   `Mods\OccupationAnnexation` junction at the release copy. Pass `-GameModsDir` if RimWorld
+   is installed elsewhere.
+2. Start RimWorld with Dev mode on. Open *Mods*, right-click *Occupation & Annexation* and
+   choose *Upload to Steam Workshop* (*Update on Steam Workshop* later).
+3. On the first upload, Steam takes the description from `About\About.xml`. After that, edit
+   the page on Steam: paste `Workshop\Description.en.bbcode`, add the Ukrainian description
+   from `Workshop\Description.uk.bbcode`, and set the visibility.
+4. Close the game and run `.\Tools\Build-Release.ps1 -LinkForDevelopment`. It points the
+   junction back at the repository and copies `About\PublishedFileId.txt`, written by the
+   game on the first upload, into the repository. Commit that file; later uploads then
+   update the same Workshop item.
+
+Bump `<modVersion>` in `About\About.xml` and `<Version>` in the `.csproj` for each release.
 
 ### Dev-mode tools
 
