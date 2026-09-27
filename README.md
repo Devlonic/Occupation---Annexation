@@ -102,3 +102,6 @@ The test covers:
 - retake and uprising.
 
 It writes the PASS/FAIL report and counts every error logged during the run.
+
+### Note from Devloner
+This mod was created using a LLM, so please keep that in mind if you use it.
