@@ -18,6 +18,8 @@ namespace OccupationAnnexation
         public float annexLoyaltyThreshold = 60f;
         public int minOccupationDays = 5;
         public float loyaltyLossPerKilledSurrendered = 8f;
+        public int goodwillLossPerKilledSurrendered = 3;
+        public bool enablePopulationGrowth = true;
 
         // Economy
         public float productionMultiplier = 1f;
@@ -42,6 +44,8 @@ namespace OccupationAnnexation
             Scribe_Values.Look(ref annexLoyaltyThreshold, "annexLoyaltyThreshold", 60f);
             Scribe_Values.Look(ref minOccupationDays, "minOccupationDays", 5);
             Scribe_Values.Look(ref loyaltyLossPerKilledSurrendered, "loyaltyLossPerKilledSurrendered", 8f);
+            Scribe_Values.Look(ref goodwillLossPerKilledSurrendered, "goodwillLossPerKilledSurrendered", 3);
+            Scribe_Values.Look(ref enablePopulationGrowth, "enablePopulationGrowth", true);
             Scribe_Values.Look(ref productionMultiplier, "productionMultiplier", 1f);
             Scribe_Values.Look(ref stockpileCapPerPawn, "stockpileCapPerPawn", 400f);
             Scribe_Values.Look(ref allowDropPodDelivery, "allowDropPodDelivery", true);
@@ -66,12 +70,14 @@ namespace OccupationAnnexation
             capitulationMoraleThreshold = list.SliderLabeled("OA_Settings_MoraleThreshold".Translate(capitulationMoraleThreshold.ToStringPercent()), capitulationMoraleThreshold, 0.05f, 0.8f, 0.6f, "OA_Settings_MoraleThreshold_Tip".Translate());
             minDefenseLossForCapitulation = list.SliderLabeled("OA_Settings_MinDefenseLoss".Translate(minDefenseLossForCapitulation.ToStringPercent()), minDefenseLossForCapitulation, 0f, 0.9f, 0.6f, "OA_Settings_MinDefenseLoss_Tip".Translate());
             minCombatTicks = Mathf.RoundToInt(list.SliderLabeled("OA_Settings_MinCombatTime".Translate(minCombatTicks.ToStringTicksToPeriod()), minCombatTicks, 0f, 10000f, 0.6f));
+            goodwillLossPerKilledSurrendered = Mathf.RoundToInt(list.SliderLabeled("OA_Settings_GoodwillLoss".Translate(goodwillLossPerKilledSurrendered), goodwillLossPerKilledSurrendered, 0f, 15f, 0.6f, "OA_Settings_GoodwillLoss_Tip".Translate()));
 
             list.GapLine();
             list.Label("OA_Settings_HeaderOccupation".Translate());
             startingLoyalty = Mathf.Round(list.SliderLabeled("OA_Settings_StartingLoyalty".Translate(startingLoyalty.ToString("F0")), startingLoyalty, 0f, 60f, 0.6f));
             annexLoyaltyThreshold = Mathf.Round(list.SliderLabeled("OA_Settings_AnnexThreshold".Translate(annexLoyaltyThreshold.ToString("F0")), annexLoyaltyThreshold, 20f, 100f, 0.6f));
             minOccupationDays = Mathf.RoundToInt(list.SliderLabeled("OA_Settings_MinOccupationDays".Translate(minOccupationDays), minOccupationDays, 0f, 30f, 0.6f));
+            list.CheckboxLabeled("OA_Settings_PopulationGrowth".Translate(), ref enablePopulationGrowth, "OA_Settings_PopulationGrowth_Tip".Translate());
 
             list.GapLine();
             list.Label("OA_Settings_HeaderEconomy".Translate());

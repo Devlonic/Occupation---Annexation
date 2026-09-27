@@ -52,6 +52,17 @@ namespace OccupationAnnexation
         /// <summary>Set by an attack; the medics are sent back down on the next tick, outside the shot or damage code.</summary>
         private bool medicsInterruptPending;
 
+        /// <summary>How many times the player's doctors tended those who capitulated; the future town remembers it.</summary>
+        public int tendedByPlayer;
+
+        /// <summary>Colonists who were here after the capitulation: they share the credit for sparing the defeated.</summary>
+        public HashSet<Pawn> participants = new HashSet<Pawn>();
+
+        /// <summary>Wounded who could not be put into a bed, and when; medics leave them on the ground for a while.</summary>
+        private readonly Dictionary<Pawn, int> carryFailedTicks = new Dictionary<Pawn, int>();
+
+        private const int CarryRetryTicks = 2500;
+
         private readonly List<Pawn> tmpDefenders = new List<Pawn>();
         private readonly List<Pawn> tmpPawns = new List<Pawn>();
 
@@ -77,10 +88,14 @@ namespace OccupationAnnexation
             Scribe_Values.Look(ref capitulatedListBuilt, "capitulatedListBuilt", false);
             Scribe_Values.Look(ref lastAttackTick, "lastAttackTick", -1);
             Scribe_Values.Look(ref medicsAnnouncedFor, "medicsAnnouncedFor", -1);
+            Scribe_Values.Look(ref tendedByPlayer, "tendedByPlayer", 0);
+            Scribe_Collections.Look(ref participants, "participants", LookMode.Reference);
             if (Scribe.mode == LoadSaveMode.PostLoadInit)
             {
                 capitulatedPawns ??= new HashSet<Pawn>();
                 capitulatedPawns.RemoveWhere(p => p == null);
+                participants ??= new HashSet<Pawn>();
+                participants.RemoveWhere(p => p == null);
             }
         }
 
@@ -223,6 +238,7 @@ namespace OccupationAnnexation
             {
                 RebuildCapitulatedList();
             }
+            RecordParticipants();
             if (capitulatedPawns.Count == 0)
             {
                 return;
@@ -279,7 +295,7 @@ namespace OccupationAnnexation
             var medics = new List<Pawn>();
             foreach (Pawn pawn in capitulatedPawns)
             {
-                if (StillCapitulated(pawn) && !pawn.Downed && SurrenderUtility.IsSurrendered(pawn) && pawn.CurJobDef == JobDefOf.TendPatient)
+                if (StillCapitulated(pawn) && !pawn.Downed && SurrenderUtility.IsSurrendered(pawn) && SurrenderMedicUtility.IsMedicJob(pawn.CurJobDef))
                 {
                     medics.Add(pawn);
                 }
@@ -318,9 +334,16 @@ namespace OccupationAnnexation
                     continue;
                 }
                 Job job = pawn.CurJob;
-                if (job?.def == JobDefOf.TendPatient)
+                if (job != null && SurrenderMedicUtility.IsMedicJob(job.def))
                 {
-                    if (!SurrenderMedicUtility.IsPatientFor(pawn, job.targetA.Pawn, needsTend: false))
+                    Pawn patient = job.targetA.Pawn;
+                    if (SurrenderMedicUtility.ClaimedByPlayer(pawn))
+                    {
+                        // A colonist is coming for them: they put everything down and wait.
+                        SurrenderMedicUtility.StowCarriedMedicine(pawn);
+                        pawn.jobs.EndCurrentJob(JobCondition.InterruptForced);
+                    }
+                    else if (!pawn.IsCarryingPawn(patient) && !SurrenderMedicUtility.IsPatientFor(pawn, patient, needsTend: false))
                     {
                         pawn.jobs.EndCurrentJob(JobCondition.Incompletable);
                     }
@@ -330,12 +353,12 @@ namespace OccupationAnnexation
                 {
                     continue;
                 }
-                if (SurrenderMedicUtility.FindPatient(pawn) == null)
+                if (!SurrenderMedicUtility.HasWork(pawn))
                 {
                     continue;
                 }
                 pawn.jobs.CheckForJobOverride();
-                if (pawn.CurJobDef == JobDefOf.TendPatient)
+                if (SurrenderMedicUtility.IsMedicJob(pawn.CurJobDef))
                 {
                     started ??= new List<Pawn>();
                     started.Add(pawn);
@@ -347,6 +370,25 @@ namespace OccupationAnnexation
                 medicsAnnouncedFor = CeasefireStartTick;
                 Messages.Message("OA_MessageSurrenderedTending".Translate(map.Parent?.LabelCap ?? map.ToString()), new LookTargets(started), MessageTypeDefOf.NeutralEvent);
                 OAMod.DebugLog($"Ceasefire at {map}: {started.Count} surrendered medics get up to tend the wounded.");
+            }
+        }
+
+        public void Notify_CarryFailed(Pawn pawn)
+        {
+            carryFailedTicks[pawn] = Find.TickManager.TicksGame;
+            OAMod.DebugLog($"Could not put {pawn} into a bed; medics leave them where they are for now.");
+        }
+
+        public bool CarryFailedRecently(Pawn pawn)
+        {
+            return carryFailedTicks.TryGetValue(pawn, out int tick) && Find.TickManager.TicksGame - tick < CarryRetryTicks;
+        }
+
+        public void RecordParticipants()
+        {
+            foreach (Pawn pawn in map.mapPawns.FreeColonistsSpawned)
+            {
+                participants.Add(pawn);
             }
         }
 
@@ -379,9 +421,12 @@ namespace OccupationAnnexation
             }
         }
 
+        /// <summary>
+        /// Someone being carried (to a bed, by a medic) is not spawned but still here.
+        /// </summary>
         public bool StillCapitulated(Pawn pawn)
         {
-            return pawn != null && !pawn.Dead && !pawn.Destroyed && pawn.Spawned && pawn.Map == map
+            return pawn != null && !pawn.Dead && !pawn.Destroyed && pawn.MapHeld == map && (pawn.Spawned || pawn.ParentHolder is Pawn_CarryTracker)
                 && !pawn.IsPrisoner && !pawn.IsSlave && pawn.Faction != null && !pawn.Faction.IsPlayer
                 && pawn.Faction.HostileTo(Faction.OfPlayer);
         }

@@ -25,17 +25,23 @@
 	<OA_Settings_HeaderEvents>Events</OA_Settings_HeaderEvents>
 	<OA_Settings_EnableUprisings>Uprisings in disloyal towns</OA_Settings_EnableUprisings>
 	<OA_Settings_EnableRetake>Former owners try to retake their towns</OA_Settings_EnableRetake>
+	<OA_Settings_GoodwillLoss>Goodwill lost with other factions per surrendered person killed: {0}</OA_Settings_GoodwillLoss>
+	<OA_Settings_GoodwillLoss_Tip>Factions at peace with you hear that your people killed someone who had laid down their arms. 0 turns this off.</OA_Settings_GoodwillLoss_Tip>
+	<OA_Settings_PopulationGrowth>Loyal towns attract newcomers</OA_Settings_PopulationGrowth>
+	<OA_Settings_PopulationGrowth_Tip>Towns with loyalty of 50 or more slowly gain new townsfolk until every bed is taken. Build beds during a visit to make room for more.</OA_Settings_PopulationGrowth_Tip>
 	<OA_Settings_DebugLogging>Debug logging</OA_Settings_DebugLogging>
 
 	<!-- ============ Capitulation ============ -->
 	<OA_LetterCapitulationLabel>{0} capitulates</OA_LetterCapitulationLabel>
-	<OA_LetterCapitulation>The defense of {0} is broken. The remaining defenders of {1} throw down their weapons and lie face down: {2} people have surrendered.\n\nThey will not fight anymore. You can take some of them prisoner; the rest become the population of the town once it is occupied.\n\nOnce the shooting has stopped for a little while, those of them who can treat the wounded will get up and tend the wounded you have not taken prisoner. Fire at them again and they abandon the wounded and lie face down.\n\nKilling those who surrendered will cost the town's loyalty.</OA_LetterCapitulation>
+	<OA_LetterCapitulation>The defense of {0} is broken. The remaining defenders of {1} throw down their weapons and lie face down: {2} people have surrendered.\n\nThey will not fight anymore. You can take some of them prisoner; the rest become the population of the town once it is occupied.\n\nOnce the shooting has stopped for a little while, those of them who can treat the wounded will get up, carry the badly wounded into the town's beds and tend the wounded you have not taken prisoner. Fire at them again and they abandon the wounded and lie face down. Your own doctors can tend them too, and the town will remember it.\n\nKilling those who surrendered will cost the town's loyalty, upset your colonists and damage your reputation.</OA_LetterCapitulation>
 	<OA_TakePrisoner>Take {0} prisoner</OA_TakePrisoner>
 	<OA_CannotTakePrisoner>Cannot take {0} prisoner</OA_CannotTakePrisoner>
 	<OA_MessageTookPrisoner>{0} took {1} prisoner.</OA_MessageTookPrisoner>
 	<OA_MessageSurrenderedTending>The shooting has stopped: those who surrendered in {0} are tending their wounded.</OA_MessageSurrenderedTending>
 	<OA_MessageSurrenderedLieDown>Shots at those who surrendered in {0}: they abandon the wounded and lie face down again.</OA_MessageSurrenderedLieDown>
 	<OA_SurrenderedTendingInspect>Surrendered: tending the wounded, unarmed</OA_SurrenderedTendingInspect>
+	<OA_MessageGoodwillKilledSurrendered>Word spreads that your people killed someone who had surrendered. Goodwill {0} with: {1}.</OA_MessageGoodwillKilledSurrendered>
+	<OA_MessageLoyaltyFromTending>The people of {0} remember that your doctors treated their wounded: loyalty +{1}.</OA_MessageLoyaltyFromTending>
 
 	<!-- ============ Occupation ============ -->
 	<OA_ProtectorateName>Protectorate of {0}</OA_ProtectorateName>
@@ -59,6 +65,8 @@
 	<OA_InspectLoyalty>Loyalty: {0} ({1})</OA_InspectLoyalty>
 	<OA_InspectCanAnnex>Ready to be annexed.</OA_InspectCanAnnex>
 	<OA_InspectPopulation>Population: {0} ({1} working), garrison: {2}</OA_InspectPopulation>
+	<OA_InspectHousing>Housing: {0} of {1} beds taken</OA_InspectHousing>
+	<OA_InspectMilitia>Militia: {0} armed</OA_InspectMilitia>
 	<OA_InspectStockpile>Stockpile: {0} of {1}</OA_InspectStockpile>
 	<OA_InspectTax>Tax: {0}</OA_InspectTax>
 	<OA_InspectProfile>Trades: {0}</OA_InspectProfile>
@@ -107,6 +115,20 @@
 	<OA_VisitTown>Visit {0}</OA_VisitTown>
 	<OA_MessageEnteredTown>{0} entered {1}.</OA_MessageEnteredTown>
 	<OA_MessageLocalKilled>A local of {0} was killed by your people: loyalty -{1}.</OA_MessageLocalKilled>
+	<OA_MessageProfileChanged>{0} now produces: {1}.</OA_MessageProfileChanged>
+	<OA_MessageNewcomer>{1} has settled in {0}.</OA_MessageNewcomer>
+	<OA_CommandMilitia>Militia</OA_CommandMilitia>
+	<OA_CommandMilitiaDesc>Train townsfolk to take weapons from the stockpile and defend the town when its former owners try to retake it. As many adults take up arms as there are weapons in the stockpile (now {3}).\n\nTraining costs {2} of the town's production. It needs loyalty {0}; below {1} the militia disbands.</OA_CommandMilitiaDesc>
+	<OA_MilitiaNeedsLoyalty>Needs loyalty {0} (now {1}).</OA_MilitiaNeedsLoyalty>
+	<OA_MessageMilitiaDisbanded>The militia of {0} has disbanded: the town is not loyal enough.</OA_MessageMilitiaDisbanded>
+	<OA_MessageMilitiaArmed>{1} townsfolk of {0} take up arms from the stockpile.</OA_MessageMilitiaArmed>
+	<OA_CommandRecruit>Recruit a volunteer</OA_CommandRecruit>
+	<OA_CommandRecruitDesc>Invite a townsperson to join your colony and leave with this caravan. Only annexed towns with loyalty {0} or more send volunteers. Each one costs {1} loyalty, and the town can spare one every {2}.</OA_CommandRecruitDesc>
+	<OA_RecruitNeedsAnnexed>Only annexed towns send volunteers.</OA_RecruitNeedsAnnexed>
+	<OA_RecruitNeedsLoyalty>Needs loyalty {0} (now {1}).</OA_RecruitNeedsLoyalty>
+	<OA_RecruitCooldown>The next volunteer in {0}.</OA_RecruitCooldown>
+	<OA_RecruitNobody>Nobody here can join.</OA_RecruitNobody>
+	<OA_MessageRecruited>{1} from {0} joins your colony.</OA_MessageRecruited>
 
 	<OA_TabTown>Town</OA_TabTown>
 	<OA_TabTownVisiting>Someone is in the town right now: its people and goods are on the map.</OA_TabTownVisiting>
@@ -144,6 +166,8 @@
 	<OA_LetterRetakeWarning>Scouts report that {1} is gathering forces to take {0} back. The attack will come in about {2}.\n\nStation a garrison there, or be in the town with your people to fight them off yourself.</OA_LetterRetakeWarning>
 	<OA_LetterRetakeRepelledLabel>{0} holds</OA_LetterRetakeRepelledLabel>
 	<OA_LetterRetakeRepelled>{1} attacked {0}, but the defenders held. The people's loyalty to you has grown.</OA_LetterRetakeRepelled>
+	<OA_LetterRetakeRepelledMilitia>The town militia ({0} armed townsfolk) fought alongside the defenders.</OA_LetterRetakeRepelledMilitia>
+	<OA_LetterRetakeMilitiaFallen>{0} fell in the fighting.</OA_LetterRetakeMilitiaFallen>
 	<OA_LetterRetakeLostLabel>{0} lost</OA_LetterRetakeLostLabel>
 	<OA_LetterRetakeLost>{1} has taken {0} back. The stockpile is lost; any garrison fled as a caravan.</OA_LetterRetakeLost>
 

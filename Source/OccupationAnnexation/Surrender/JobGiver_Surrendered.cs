@@ -11,10 +11,10 @@ namespace OccupationAnnexation
             {
                 return null;
             }
-            Job tend = SurrenderMedicUtility.TryGiveTendJob(pawn);
-            if (tend != null)
+            Job medic = SurrenderMedicUtility.TryGiveMedicJob(pawn);
+            if (medic != null)
             {
-                return tend;
+                return medic;
             }
             Job job = JobMaker.MakeJob(OA_DefOf.OA_Surrender, pawn.Position);
             job.expiryInterval = -1;

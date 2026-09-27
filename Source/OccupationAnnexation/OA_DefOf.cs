@@ -11,6 +11,12 @@ namespace OccupationAnnexation
 
         public static JobDef OA_Surrender;
         public static JobDef OA_TakeSurrenderedPrisoner;
+        public static JobDef OA_CarryWoundedToBed;
+
+        public static ThoughtDef OA_KilledSurrendered;
+        public static ThoughtDef OA_SparedSurrendered;
+
+        public static HistoryEventDef OA_SurrenderedKilled;
 
         public static DutyDef OA_Capitulated;
 

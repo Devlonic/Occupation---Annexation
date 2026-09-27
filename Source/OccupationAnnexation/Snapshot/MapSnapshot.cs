@@ -12,7 +12,7 @@ namespace OccupationAnnexation
     /// </summary>
     public class MapSnapshot : IExposable
     {
-        private const int Margin = 4;
+        public const int Margin = 4;
 
         public IntVec3 mapSize;
         public CellRect rect;

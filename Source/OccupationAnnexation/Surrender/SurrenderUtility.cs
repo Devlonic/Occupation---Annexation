@@ -80,6 +80,7 @@ namespace OccupationAnnexation
             morale.capitulated = true;
             morale.capitulationTick = Find.TickManager.TicksGame;
             morale.MarkCapitulatedListBuilt();
+            morale.RecordParticipants();
 
             List<Pawn> survivors = map.mapPawns.SpawnedPawnsInFaction(faction).Where(p => IsDefenderOf(p, faction)).ToList();
             var surrendered = new List<Pawn>();

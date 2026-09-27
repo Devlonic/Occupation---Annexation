@@ -15,6 +15,12 @@ namespace OccupationAnnexation
         public override bool CanBlockHostileVisitors => false;
 
         /// <summary>
+        /// The town's doors now belong to the Protectorate, which is at war with them. Medics still have to get
+        /// through their own town to carry the wounded to its beds.
+        /// </summary>
+        public override bool CanOpenAnyDoor(Pawn p) => true;
+
+        /// <summary>
         /// Vanilla drops pawns from their lord when they go down. A capitulated pawn who bleeds out and later
         /// gets back up would then have neither the surrender nor the threat-disabled duty: an enemy again.
         /// </summary>

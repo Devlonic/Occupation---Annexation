@@ -48,12 +48,7 @@ namespace OccupationAnnexation
             Header(ref y, viewRect.width, "OA_TabPopulation".Translate(town.PopulationCount));
             foreach (Pawn pawn in town.Population.OrderByDescending(p => p.ageTracker.AgeBiologicalYears))
             {
-                SkillRecord best = pawn.skills?.skills.Where(s => !s.TotallyDisabled).OrderByDescending(s => s.Level).FirstOrDefault();
-                string line = pawn.LabelCap + ", " + pawn.ageTracker.AgeBiologicalYears;
-                if (best != null)
-                {
-                    line += " — " + best.def.skillLabel.CapitalizeFirst() + " " + best.Level;
-                }
+                string line = PopulationUtility.Describe(pawn);
                 if (pawn.Downed)
                 {
                     line += " (" + "Downed".Translate() + ")";

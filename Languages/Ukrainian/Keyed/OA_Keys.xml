@@ -25,17 +25,23 @@
 	<OA_Settings_HeaderEvents>Події</OA_Settings_HeaderEvents>
 	<OA_Settings_EnableUprisings>Повстання в нелояльних містах</OA_Settings_EnableUprisings>
 	<OA_Settings_EnableRetake>Колишні власники намагаються відвоювати свої міста</OA_Settings_EnableRetake>
+	<OA_Settings_GoodwillLoss>Втрата доброзичливості інших фракцій за кожного вбитого, хто здався: {0}</OA_Settings_GoodwillLoss>
+	<OA_Settings_GoodwillLoss_Tip>Фракції, з якими у вас мир, дізнаються, що ваші люди вбили того, хто склав зброю. 0 вимикає це.</OA_Settings_GoodwillLoss_Tip>
+	<OA_Settings_PopulationGrowth>Лояльні міста приваблюють новоприбулих</OA_Settings_PopulationGrowth>
+	<OA_Settings_PopulationGrowth_Tip>Міста з лояльністю від 50 поступово отримують нових мешканців, поки не будуть зайняті всі ліжка. Збудуйте ліжка під час візиту, щоб звільнити місце для більшої кількості людей.</OA_Settings_PopulationGrowth_Tip>
 	<OA_Settings_DebugLogging>Налагоджувальний лог</OA_Settings_DebugLogging>
 
 	<!-- ============ Капітуляція ============ -->
 	<OA_LetterCapitulationLabel>{0} капітулює</OA_LetterCapitulationLabel>
-	<OA_LetterCapitulation>Оборону {0} зламано. Решта оборонців {1} кидають зброю й лягають обличчям донизу: здалися {2} осіб.\n\nВони більше не битимуться. Декого можна взяти в полон, решта стане населенням міста після окупації.\n\nКоли стрілянина ненадовго вщухне, ті з них, хто вміє лікувати, підведуться й надаватимуть допомогу пораненим, яких ви не взяли в полон. Відкриєте по них вогонь — вони кинуть поранених і знову ляжуть обличчям донизу.\n\nВбивство тих, хто здався, знизить лояльність міста.</OA_LetterCapitulation>
+	<OA_LetterCapitulation>Оборону {0} зламано. Решта оборонців {1} кидають зброю й лягають обличчям донизу: здалися {2} осіб.\n\nВони більше не битимуться. Декого можна взяти в полон, решта стане населенням міста після окупації.\n\nКоли стрілянина ненадовго вщухне, ті з них, хто вміє лікувати, підведуться, перенесуть важкопоранених у ліжка міста й надаватимуть допомогу пораненим, яких ви не взяли в полон. Відкриєте по них вогонь — вони кинуть поранених і знову ляжуть обличчям донизу. Ваші лікарі теж можуть їх лікувати, і місто це запам'ятає.\n\nВбивство тих, хто здався, знизить лояльність міста, засмутить ваших колоністів і зашкодить вашій репутації.</OA_LetterCapitulation>
 	<OA_TakePrisoner>Взяти в полон: {0}</OA_TakePrisoner>
 	<OA_CannotTakePrisoner>Неможливо взяти в полон: {0}</OA_CannotTakePrisoner>
 	<OA_MessageTookPrisoner>{0} бере в полон: {1}.</OA_MessageTookPrisoner>
 	<OA_MessageSurrenderedTending>Стрілянина вщухла: ті, хто здався в {0}, надають допомогу своїм пораненим.</OA_MessageSurrenderedTending>
 	<OA_MessageSurrenderedLieDown>Постріли по тих, хто здався в {0}: вони кидають поранених і знову лягають обличчям донизу.</OA_MessageSurrenderedLieDown>
 	<OA_SurrenderedTendingInspect>Здався: надає допомогу пораненим, беззбройний</OA_SurrenderedTendingInspect>
+	<OA_MessageGoodwillKilledSurrendered>Поширюються чутки, що ваші люди вбили того, хто здався. Доброзичливість {0} з: {1}.</OA_MessageGoodwillKilledSurrendered>
+	<OA_MessageLoyaltyFromTending>Люди {0} пам'ятають, що ваші лікарі лікували їхніх поранених: лояльність +{1}.</OA_MessageLoyaltyFromTending>
 
 	<!-- ============ Окупація ============ -->
 	<OA_ProtectorateName>Протекторат {0}</OA_ProtectorateName>
@@ -59,6 +65,8 @@
 	<OA_InspectLoyalty>Лояльність: {0} ({1})</OA_InspectLoyalty>
 	<OA_InspectCanAnnex>Готове до анексії.</OA_InspectCanAnnex>
 	<OA_InspectPopulation>Населення: {0} (працює {1}), гарнізон: {2}</OA_InspectPopulation>
+	<OA_InspectHousing>Житло: зайнято {0} з {1} ліжок</OA_InspectHousing>
+	<OA_InspectMilitia>Ополчення: озброєно {0}</OA_InspectMilitia>
 	<OA_InspectStockpile>Склад: {0} з {1}</OA_InspectStockpile>
 	<OA_InspectTax>Податок: {0}</OA_InspectTax>
 	<OA_InspectProfile>Ремесла: {0}</OA_InspectProfile>
@@ -107,6 +115,20 @@
 	<OA_VisitTown>Відвідати {0}</OA_VisitTown>
 	<OA_MessageEnteredTown>{0} увійшов у {1}.</OA_MessageEnteredTown>
 	<OA_MessageLocalKilled>Ваші люди вбили мешканця {0}: лояльність -{1}.</OA_MessageLocalKilled>
+	<OA_MessageProfileChanged>{0} тепер виробляє: {1}.</OA_MessageProfileChanged>
+	<OA_MessageNewcomer>{1} оселяється в {0}.</OA_MessageNewcomer>
+	<OA_CommandMilitia>Ополчення</OA_CommandMilitia>
+	<OA_CommandMilitiaDesc>Навчити містян брати зброю зі складу й обороняти місто, коли колишні власники намагатимуться його відбити. До зброї стане стільки дорослих, скільки на складі зброї (зараз {3}).\n\nНавчання забирає {2} виробництва міста. Потрібна лояльність {0}; нижче {1} ополчення розпускається.</OA_CommandMilitiaDesc>
+	<OA_MilitiaNeedsLoyalty>Потрібна лояльність {0} (зараз {1}).</OA_MilitiaNeedsLoyalty>
+	<OA_MessageMilitiaDisbanded>Ополчення {0} розпущено: місто недостатньо лояльне.</OA_MessageMilitiaDisbanded>
+	<OA_MessageMilitiaArmed>Містяни {0} беруть зброю зі складу: {1} осіб.</OA_MessageMilitiaArmed>
+	<OA_CommandRecruit>Набрати добровольця</OA_CommandRecruit>
+	<OA_CommandRecruitDesc>Запросити містянина приєднатися до вашої колонії й піти з цим караваном. Добровольців дають лише анексовані міста з лояльністю від {0}. Кожен коштує {1} лояльності, і місто може відпустити одного раз на {2}.</OA_CommandRecruitDesc>
+	<OA_RecruitNeedsAnnexed>Добровольців дають лише анексовані міста.</OA_RecruitNeedsAnnexed>
+	<OA_RecruitNeedsLoyalty>Потрібна лояльність {0} (зараз {1}).</OA_RecruitNeedsLoyalty>
+	<OA_RecruitCooldown>Наступний доброволець через {0}.</OA_RecruitCooldown>
+	<OA_RecruitNobody>Тут ніхто не може приєднатися.</OA_RecruitNobody>
+	<OA_MessageRecruited>{1} з {0} приєднується до вашої колонії.</OA_MessageRecruited>
 
 	<OA_TabTown>Місто</OA_TabTown>
 	<OA_TabTownVisiting>Зараз у місті хтось є: його люди й товари на мапі.</OA_TabTownVisiting>
@@ -144,6 +166,8 @@
 	<OA_LetterRetakeWarning>Розвідники доповідають: {1} збирає сили, щоб відвоювати {0}. Напад станеться приблизно через {2}.\n\nЗалиште там гарнізон або будьте в місті зі своїми людьми, щоб відбити напад самостійно.</OA_LetterRetakeWarning>
 	<OA_LetterRetakeRepelledLabel>{0} вистояло</OA_LetterRetakeRepelledLabel>
 	<OA_LetterRetakeRepelled>{1} атакувала {0}, але оборонці вистояли. Лояльність людей до вас зросла.</OA_LetterRetakeRepelled>
+	<OA_LetterRetakeRepelledMilitia>Міське ополчення ({0} озброєних містян) билося пліч-о-пліч з оборонцями.</OA_LetterRetakeRepelledMilitia>
+	<OA_LetterRetakeMilitiaFallen>{0} {PAWN_gender ? загинув : загинула} у бою.</OA_LetterRetakeMilitiaFallen>
 	<OA_LetterRetakeLostLabel>{0} втрачено</OA_LetterRetakeLostLabel>
 	<OA_LetterRetakeLost>{1} відвоювала {0}. Склад втрачено; гарнізон, якщо був, утік караваном.</OA_LetterRetakeLost>
 

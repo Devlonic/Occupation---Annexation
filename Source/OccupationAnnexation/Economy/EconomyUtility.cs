@@ -24,6 +24,8 @@ namespace OccupationAnnexation
             HealPawns(town);
             UpdateLoyalty(town);
             Produce(town, 1f);
+            PopulationUtility.DailyGrowth(town);
+            TownMilitiaUtility.DailyCheck(town);
             TownEventsUtility.DailyChecks(town);
         }
 
@@ -93,7 +95,8 @@ namespace OccupationAnnexation
         {
             float loyaltyFactor = Mathf.Lerp(0.3f, 1.2f, town.loyalty / 100f);
             float stateFactor = town.state == OccupationState.Occupied ? 0.5f : 1f;
-            return OAMod.Settings.productionMultiplier * loyaltyFactor * stateFactor * TaxOutputFactor(town.tax);
+            float militiaFactor = town.militia ? TownMilitiaUtility.ProductionFactor : 1f;
+            return OAMod.Settings.productionMultiplier * loyaltyFactor * stateFactor * militiaFactor * TaxOutputFactor(town.tax);
         }
 
         /// <summary>

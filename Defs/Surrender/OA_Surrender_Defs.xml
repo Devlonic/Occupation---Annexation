@@ -39,6 +39,69 @@
 		<casualInterruptible>false</casualInterruptible>
 	</JobDef>
 
+	<JobDef>
+		<defName>OA_CarryWoundedToBed</defName>
+		<driverClass>OccupationAnnexation.JobDriver_CarryWoundedToBed</driverClass>
+		<reportString>carrying TargetA to a bed.</reportString>
+		<casualInterruptible>false</casualInterruptible>
+	</JobDef>
+
+	<!-- Killing someone who lay face down, unarmed. How it feels depends on the ideoligion's view of executions and on traits. -->
+	<ThoughtDef>
+		<defName>OA_KilledSurrendered</defName>
+		<thoughtClass>Thought_Memory</thoughtClass>
+		<durationDays>8</durationDays>
+		<stackLimit>5</stackLimit>
+		<stackedEffectMultiplier>0.75</stackedEffectMultiplier>
+		<stages>
+			<li>
+				<label>surrendered enemy murdered</label>
+				<description>They had thrown down their weapons and lay face down, and we killed them anyway. That is an abomination.</description>
+				<baseMoodEffect>-12</baseMoodEffect>
+			</li>
+			<li>
+				<label>surrendered enemy killed</label>
+				<description>They had thrown down their weapons and lay face down, and we killed them anyway. That was wrong.</description>
+				<baseMoodEffect>-7</baseMoodEffect>
+			</li>
+			<li>
+				<label>unarmed enemy killed</label>
+				<description>They had surrendered. Killing an unarmed enemy leaves a bad taste.</description>
+				<baseMoodEffect>-4</baseMoodEffect>
+			</li>
+			<li>
+				<label>enemy finished off</label>
+				<description>A surrender changes nothing. The enemy got what they deserved.</description>
+				<baseMoodEffect>3</baseMoodEffect>
+			</li>
+		</stages>
+	</ThoughtDef>
+
+	<!-- Leaving a capitulated town without killing anyone who surrendered. -->
+	<ThoughtDef>
+		<defName>OA_SparedSurrendered</defName>
+		<thoughtClass>Thought_Memory</thoughtClass>
+		<durationDays>6</durationDays>
+		<stackLimit>1</stackLimit>
+		<stages>
+			<li>
+				<label>proudly spared the defeated</label>
+				<description>When they laid down their arms, we let them live. We won, and we are still decent people.</description>
+				<baseMoodEffect>5</baseMoodEffect>
+			</li>
+			<li>
+				<label>spared the defeated</label>
+				<description>When they laid down their arms, we let them live.</description>
+				<baseMoodEffect>3</baseMoodEffect>
+			</li>
+		</stages>
+	</ThoughtDef>
+
+	<HistoryEventDef>
+		<defName>OA_SurrenderedKilled</defName>
+		<label>killed someone who surrendered</label>
+	</HistoryEventDef>
+
 	<DutyDef>
 		<defName>OA_Capitulated</defName>
 		<threatDisabled>true</threatDisabled>

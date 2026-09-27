@@ -121,8 +121,9 @@ namespace OccupationAnnexation
 
             if (town.HasMap)
             {
-                // The player is there: a real raid on the town map.
+                // The player is there: a real raid on the town map, and the militia takes up arms.
                 Map map = town.Map;
+                TownMilitiaUtility.ArmMilitia(town, map);
                 var parms = new IncidentParms
                 {
                     target = map,
@@ -139,15 +140,37 @@ namespace OccupationAnnexation
                 return;
             }
 
-            float defense = town.GarrisonCount * 1.5f + town.WorkerCount * 0.15f * (town.loyalty / 100f);
+            float defense = DefenseStrength(town);
             float attack = Rand.Range(1f, 4f);
             if (defense >= attack || Rand.Chance(defense / (defense + attack)))
             {
                 town.loyalty = Mathf.Min(100f, town.loyalty + 10f);
-                Find.LetterStack.ReceiveLetter("OA_LetterRetakeRepelledLabel".Translate(town.Label), "OA_LetterRetakeRepelled".Translate(town.Label, attacker.Name), LetterDefOf.PositiveEvent, town, attacker);
+                string text = "OA_LetterRetakeRepelled".Translate(town.Label, attacker.Name);
+                int militia = TownMilitiaUtility.MilitiaSize(town);
+                if (militia > 0)
+                {
+                    text += "\n\n" + "OA_LetterRetakeRepelledMilitia".Translate(militia);
+                    Pawn fallen = Rand.Chance(0.35f) ? town.Population.Where(p => !p.Downed && p.DevelopmentalStage.Adult()).RandomElementWithFallback() : null;
+                    if (fallen != null && town.PopulationCount > 1)
+                    {
+                        town.contents.Remove(fallen);
+                        fallen.Kill(null);
+                        Find.WorldPawns.PassToWorld(fallen, PawnDiscardDecideMode.Decide);
+                        text += " " + "OA_LetterRetakeMilitiaFallen".Translate(fallen.LabelShort, fallen.Named("PAWN"));
+                    }
+                }
+                Find.LetterStack.ReceiveLetter("OA_LetterRetakeRepelledLabel".Translate(town.Label), text, LetterDefOf.PositiveEvent, town, attacker);
                 return;
             }
             LoseTown(town, attacker, "OA_LetterRetakeLostLabel".Translate(town.Label), "OA_LetterRetakeLost".Translate(town.Label, attacker.Name));
+        }
+
+        /// <summary>
+        /// The garrison, the townsfolk's willingness to help and the armed militia, against an attack of 1 to 4.
+        /// </summary>
+        public static float DefenseStrength(OccupiedSettlement town)
+        {
+            return town.GarrisonCount * 1.5f + town.WorkerCount * 0.15f * (town.loyalty / 100f) + TownMilitiaUtility.Strength(town);
         }
 
         // ------------------------------------------------------------------ losing a town

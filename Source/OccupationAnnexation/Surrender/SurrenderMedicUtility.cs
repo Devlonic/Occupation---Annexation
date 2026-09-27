@@ -1,3 +1,4 @@
+using System.Linq;
 using RimWorld;
 using Verse;
 using Verse.AI;
@@ -5,8 +6,9 @@ using Verse.AI;
 namespace OccupationAnnexation
 {
     /// <summary>
-    /// Once the shooting has stopped after a capitulation, surrendered defenders who can doctor get up and tend
-    /// their wounded that were not taken prisoner, with the medicine they carry, then lie back down.
+    /// Once the shooting has stopped after a capitulation, surrendered defenders who can doctor get up, carry their
+    /// downed comrades into the town's beds and tend the wounded that were not taken prisoner, with the medicine
+    /// they carry, then lie back down.
     /// A shot or blow from the player toward them starts the ceasefire over: the medics drop their patients and lie face down.
     /// </summary>
     public static class SurrenderMedicUtility
@@ -35,7 +37,15 @@ namespace OccupationAnnexation
             }
             MapComponent_SiegeMorale morale = pawn.Map.GetComponent<MapComponent_SiegeMorale>();
             return morale != null && morale.capitulated && morale.capitulatedPawns.Contains(pawn) && morale.StillCapitulated(pawn)
-                && Find.TickManager.TicksGame >= morale.TendAllowedTick(pawn) && CanDoctor(pawn);
+                && Find.TickManager.TicksGame >= morale.TendAllowedTick(pawn) && CanDoctor(pawn) && !ClaimedByPlayer(pawn);
+        }
+
+        /// <summary>
+        /// A colonist is coming to take them prisoner or to tend them: they stay down and wait.
+        /// </summary>
+        public static bool ClaimedByPlayer(Pawn pawn)
+        {
+            return pawn.Spawned && pawn.Map.reservationManager.IsReservedByAnyoneOf(pawn, Faction.OfPlayer);
         }
 
         /// <summary>
@@ -64,7 +74,7 @@ namespace OccupationAnnexation
         /// <summary>
         /// The downed come first, then the worst bleeding, then the nearest. The medic's own wounds come last.
         /// </summary>
-        public static Pawn FindPatient(Pawn medic)
+        public static Pawn FindPatient(Pawn medic, bool bleedingOnly = false)
         {
             Pawn best = null;
             bool bestDowned = false;
@@ -72,7 +82,7 @@ namespace OccupationAnnexation
             int bestDistance = int.MaxValue;
             foreach (Pawn pawn in medic.Map.mapPawns.SpawnedPawnsInFaction(medic.Faction))
             {
-                if (pawn == medic || !IsPatientFor(medic, pawn, needsTend: true))
+                if (pawn == medic || !IsPatientFor(medic, pawn, needsTend: true) || (bleedingOnly && !(pawn.health.hediffSet.BleedRateTotal > 0f)))
                 {
                     continue;
                 }
@@ -109,20 +119,109 @@ namespace OccupationAnnexation
                 bestBleeding = bleeding;
                 bestDistance = distance;
             }
-            if (best == null && IsPatientFor(medic, medic, needsTend: true))
+            if (best == null && IsPatientFor(medic, medic, needsTend: true) && (!bleedingOnly || medic.health.hediffSet.BleedRateTotal > 0f))
             {
                 best = medic;
             }
             return best;
         }
 
-        public static Job TryGiveTendJob(Pawn medic)
+        public static bool IsMedicJob(JobDef def)
+        {
+            return def == JobDefOf.TendPatient || def == OA_DefOf.OA_CarryWoundedToBed;
+        }
+
+        /// <summary>
+        /// Anyone this medic could carry to a bed or tend right now.
+        /// </summary>
+        public static bool HasWork(Pawn medic)
+        {
+            return FindWoundedToCarry(medic, out _) != null || FindPatient(medic) != null;
+        }
+
+        /// <summary>
+        /// A downed comrade lying on the ground, nearest first, and a free bed of the town for them.
+        /// </summary>
+        public static Pawn FindWoundedToCarry(Pawn medic, out Building_Bed bed)
+        {
+            bed = null;
+            Pawn best = null;
+            int bestDistance = int.MaxValue;
+            MapComponent_SiegeMorale morale = medic.Map.GetComponent<MapComponent_SiegeMorale>();
+            foreach (Pawn pawn in medic.Map.mapPawns.SpawnedPawnsInFaction(medic.Faction))
+            {
+                if (pawn == medic || !pawn.Downed || pawn.InBed() || !IsPatientFor(medic, pawn, needsTend: false) || morale?.CarryFailedRecently(pawn) == true)
+                {
+                    continue;
+                }
+                int distance = medic.Position.DistanceToSquared(pawn.Position);
+                if (distance >= bestDistance || !medic.CanReserveAndReach(pawn, PathEndMode.ClosestTouch, Danger.Deadly))
+                {
+                    continue;
+                }
+                Building_Bed free = FindBedFor(medic, pawn);
+                if (free == null)
+                {
+                    continue;
+                }
+                best = pawn;
+                bestDistance = distance;
+                bed = free;
+            }
+            return best;
+        }
+
+        /// <summary>
+        /// Medical beds first, then the nearest. Beds of the player and for prisoners or slaves are left alone.
+        /// </summary>
+        public static Building_Bed FindBedFor(Pawn medic, Pawn patient)
+        {
+            Building_Bed best = null;
+            float bestScore = float.MinValue;
+            foreach (Thing thing in medic.Map.listerThings.ThingsInGroup(ThingRequestGroup.Bed))
+            {
+                if (!(thing is Building_Bed bed) || !bed.def.building.bed_humanlike || bed.Faction == Faction.OfPlayer || bed.ForPrisoners || bed.ForSlaves)
+                {
+                    continue;
+                }
+                float score = (bed.Medical ? 10000f : 0f) - patient.Position.DistanceTo(bed.Position);
+                if (score <= bestScore)
+                {
+                    continue;
+                }
+                if (!RestUtility.CanUseBedNow(bed, patient, checkSocialProperness: false, allowMedBedEvenIfSetToNoCare: true)
+                    || !medic.CanReserveAndReach(bed, PathEndMode.Touch, Danger.Deadly, bed.SleepingSlotsCount, 0))
+                {
+                    continue;
+                }
+                best = bed;
+                bestScore = score;
+            }
+            return best;
+        }
+
+        /// <summary>
+        /// Triage: bleeding is stopped first, then the seriously wounded are carried into beds, then the rest is tended.
+        /// </summary>
+        public static Job TryGiveMedicJob(Pawn medic)
         {
             if (!MayTendNow(medic))
             {
                 return null;
             }
-            Pawn patient = FindPatient(medic);
+            Pawn patient = FindPatient(medic, bleedingOnly: true);
+            if (patient == null)
+            {
+                Pawn wounded = FindWoundedToCarry(medic, out Building_Bed bed);
+                if (wounded != null)
+                {
+                    OAMod.DebugLog($"{medic} carries {wounded} to {bed} at {bed.Position}.");
+                    Job carry = JobMaker.MakeJob(OA_DefOf.OA_CarryWoundedToBed, wounded, bed);
+                    carry.count = 1;
+                    return carry;
+                }
+                patient = FindPatient(medic);
+            }
             if (patient == null)
             {
                 return null;
@@ -134,6 +233,30 @@ namespace OccupationAnnexation
                 : JobMaker.MakeJob(JobDefOf.TendPatient, patient);
             job.endAfterTendedOnce = patient == medic;
             return job;
+        }
+
+        /// <summary>
+        /// For the player's doctor: the least potent medicine in its pockets, or else the nearest least potent one on the map.
+        /// </summary>
+        public static Thing FindCheapestMedicine(Pawn doctor, Pawn patient)
+        {
+            if (Medicine.GetMedicineCountToFullyHeal(patient) <= 0)
+            {
+                return null;
+            }
+            Thing carried = doctor.inventory?.innerContainer.Where(t => t.def.IsMedicine).OrderBy(Potency).FirstOrDefault();
+            if (carried != null)
+            {
+                return carried;
+            }
+            Map map = patient.MapHeld;
+            return GenClosest.ClosestThing_Global_Reachable(patient.PositionHeld, map, map.listerThings.ThingsInGroup(ThingRequestGroup.Medicine),
+                PathEndMode.ClosestTouch, TraverseParms.For(doctor), 9999f, m => !m.IsForbidden(doctor) && doctor.CanReserve(m, 10, 1), m => -Potency(m));
+        }
+
+        private static float Potency(Thing medicine)
+        {
+            return medicine.def.GetStatValueAbstract(StatDefOf.MedicalPotency);
         }
 
         /// <summary>

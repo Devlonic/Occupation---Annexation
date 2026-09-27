@@ -59,6 +59,10 @@ namespace OccupationAnnexation
         public bool stockpileFullNotified;
         public int lowLoyaltyDays;
         public int retakeAttackTick = -1;
+        public bool militia;
+        public int lastRecruitTick = -1;
+        /// <summary>Sleeping places counted in the snapshot; -1 until counted.</summary>
+        public int housing = -1;
 
         private Material cachedMat;
         private List<ThingDef> tmpProgressKeys;
@@ -363,7 +367,12 @@ namespace OccupationAnnexation
             if (!HasMap)
             {
                 Line("OA_InspectPopulation".Translate(PopulationCount, WorkerCount, GarrisonCount));
+                Line("OA_InspectHousing".Translate(PopulationCount, PopulationUtility.Housing(this)));
                 Line("OA_InspectStockpile".Translate(StockValue.ToStringMoney(), StockCap.ToStringMoney()));
+            }
+            if (militia)
+            {
+                Line("OA_InspectMilitia".Translate(TownMilitiaUtility.MilitiaSize(this)));
             }
             Line("OA_InspectTax".Translate(EconomyUtility.TaxLabel(tax)));
             if (retakeAttackTick >= 0 && originalFaction != null)
@@ -372,7 +381,7 @@ namespace OccupationAnnexation
             }
             if (profile.Count > 0)
             {
-                Line("OA_InspectProfile".Translate(profile.Select(p => p.def.label + " " + p.share.ToStringPercent()).ToCommaList()));
+                Line("OA_InspectProfile".Translate(OccupationUtility.ProfileText(this)));
             }
             return sb.ToString();
         }
@@ -416,6 +425,21 @@ namespace OccupationAnnexation
                     Find.WindowStack.Add(new FloatMenu(options));
                 }
             };
+
+            var militiaToggle = new Command_Toggle
+            {
+                defaultLabel = "OA_CommandMilitia".Translate(),
+                defaultDesc = "OA_CommandMilitiaDesc".Translate(TownMilitiaUtility.MinLoyalty.ToString("F0"), TownMilitiaUtility.DisbandLoyalty.ToString("F0"),
+                    (1f - TownMilitiaUtility.ProductionFactor).ToStringPercent(), TownMilitiaUtility.WeaponsInStock(this)),
+                icon = TexCommand.FireAtWill,
+                isActive = () => militia,
+                toggleAction = () => militia = !militia
+            };
+            if (!militia && loyalty < TownMilitiaUtility.MinLoyalty)
+            {
+                militiaToggle.Disable("OA_MilitiaNeedsLoyalty".Translate(TownMilitiaUtility.MinLoyalty.ToString("F0"), loyalty.ToString("F0")));
+            }
+            yield return militiaToggle;
 
             var delivery = new Command_Action
             {
@@ -604,6 +628,32 @@ namespace OccupationAnnexation
                 garrison.Disable("OA_GarrisonNeedsOneLeft".Translate());
             }
             yield return garrison;
+
+            var recruit = new Command_Action
+            {
+                defaultLabel = "OA_CommandRecruit".Translate(),
+                defaultDesc = "OA_CommandRecruitDesc".Translate(PopulationUtility.RecruitMinLoyalty.ToString("F0"), PopulationUtility.RecruitLoyaltyCost.ToString("F0"),
+                    PopulationUtility.RecruitCooldownTicks.ToStringTicksToPeriod()),
+                icon = TakeIcon,
+                action = () =>
+                {
+                    var options = new List<FloatMenuOption>();
+                    foreach (Pawn pawn in PopulationUtility.RecruitCandidates(this))
+                    {
+                        Pawn captured = pawn;
+                        options.Add(new FloatMenuOption(PopulationUtility.Describe(captured), () => PopulationUtility.Recruit(this, captured, caravan)));
+                    }
+                    if (options.Count > 0)
+                    {
+                        Find.WindowStack.Add(new FloatMenu(options));
+                    }
+                }
+            };
+            if (!PopulationUtility.CanRecruitNow(this, out string recruitReason))
+            {
+                recruit.Disable(recruitReason);
+            }
+            yield return recruit;
         }
 
         /// <summary>Everything on the town map that keeps a caravan from reforming.</summary>
@@ -683,6 +733,9 @@ namespace OccupationAnnexation
             Scribe_Values.Look(ref stockpileFullNotified, "stockpileFullNotified", false);
             Scribe_Values.Look(ref lowLoyaltyDays, "lowLoyaltyDays", 0);
             Scribe_Values.Look(ref retakeAttackTick, "retakeAttackTick", -1);
+            Scribe_Values.Look(ref militia, "militia", false);
+            Scribe_Values.Look(ref lastRecruitTick, "lastRecruitTick", -1);
+            Scribe_Values.Look(ref housing, "housing", -1);
             if (Scribe.mode == LoadSaveMode.PostLoadInit)
             {
                 contents ??= new ThingOwner<Thing>(this, oneStackOnly: false);

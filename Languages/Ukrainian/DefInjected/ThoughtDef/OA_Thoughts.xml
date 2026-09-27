@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+	<OA_KilledSurrendered.stages.surrendered_enemy_murdered.label>убивство ворога, який здався</OA_KilledSurrendered.stages.surrendered_enemy_murdered.label>
+	<OA_KilledSurrendered.stages.surrendered_enemy_murdered.description>Вони кинули зброю й лежали обличчям донизу, а ми все одно їх убили. Це мерзота.</OA_KilledSurrendered.stages.surrendered_enemy_murdered.description>
+	<OA_KilledSurrendered.stages.surrendered_enemy_killed.label>убито ворога, який здався</OA_KilledSurrendered.stages.surrendered_enemy_killed.label>
+	<OA_KilledSurrendered.stages.surrendered_enemy_killed.description>Вони кинули зброю й лежали обличчям донизу, а ми все одно їх убили. Так не можна.</OA_KilledSurrendered.stages.surrendered_enemy_killed.description>
+	<OA_KilledSurrendered.stages.unarmed_enemy_killed.label>убито беззбройного ворога</OA_KilledSurrendered.stages.unarmed_enemy_killed.label>
+	<OA_KilledSurrendered.stages.unarmed_enemy_killed.description>Вони здалися. Від убивства беззбройного лишається неприємний осад.</OA_KilledSurrendered.stages.unarmed_enemy_killed.description>
+	<OA_KilledSurrendered.stages.enemy_finished_off.label>ворога добито</OA_KilledSurrendered.stages.enemy_finished_off.label>
+	<OA_KilledSurrendered.stages.enemy_finished_off.description>Капітуляція нічого не змінює. Ворог отримав по заслугах.</OA_KilledSurrendered.stages.enemy_finished_off.description>
+
+	<OA_SparedSurrendered.stages.proudly_spared_the_defeated.label>пощадили переможених</OA_SparedSurrendered.stages.proudly_spared_the_defeated.label>
+	<OA_SparedSurrendered.stages.proudly_spared_the_defeated.description>Коли вони склали зброю, ми залишили їх живими. Ми перемогли й лишилися порядними людьми.</OA_SparedSurrendered.stages.proudly_spared_the_defeated.description>
+	<OA_SparedSurrendered.stages.spared_the_defeated.label>пощадили переможених</OA_SparedSurrendered.stages.spared_the_defeated.label>
+	<OA_SparedSurrendered.stages.spared_the_defeated.description>Коли вони склали зброю, ми залишили їх живими.</OA_SparedSurrendered.stages.spared_the_defeated.description>
+</LanguageData>

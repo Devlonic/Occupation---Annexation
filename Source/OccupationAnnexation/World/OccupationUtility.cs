@@ -13,6 +13,8 @@ namespace OccupationAnnexation
     public static class OccupationUtility
     {
         private const float LoyaltyLossPerPrisonerTaken = 2f;
+        public const float LoyaltyPerTend = 1.5f;
+        public const float MaxLoyaltyFromTending = 15f;
 
         /// <summary>
         /// Replaces the vanilla "settlement destroyed" outcome: the town survives as an occupied settlement
@@ -37,7 +39,8 @@ namespace OccupationAnnexation
             town.nextDayTick = now + GenDate.TicksPerDay;
             town.doorsAlwaysOpenForPlayerPawns = true;
             town.townRect = ComputeTownRect(map, original);
-            town.profile = DetermineProfile(map, town.townRect);
+            // The same area the snapshot keeps, so the first leave does not count anything new.
+            town.profile = DetermineProfile(map, town.townRect.ExpandedBy(MapSnapshot.Margin).ClipInsideMap(map));
             town.loyalty = Mathf.Clamp(OAMod.Settings.startingLoyalty, 0f, 100f);
             Find.WorldObjects.Add(town);
 
@@ -110,6 +113,11 @@ namespace OccupationAnnexation
             {
                 Log.Error("[Occupation & Annexation] Failed to snapshot " + town.Label + ": " + e);
             }
+            if (town.snapshot != null)
+            {
+                town.housing = PopulationUtility.CountHousing(town.snapshot);
+                UpdateProfile(town, map, town.snapshot.rect);
+            }
 
             MapComponent_SiegeMorale morale = map.GetComponent<MapComponent_SiegeMorale>();
             if (morale != null)
@@ -120,8 +128,20 @@ namespace OccupationAnnexation
                     town.loyalty = Mathf.Clamp(town.loyalty - loss, 0f, 100f);
                     Messages.Message("OA_MessageLoyaltyLostFromStay".Translate(town.Label, loss.ToString("F0")), town, MessageTypeDefOf.NegativeEvent);
                 }
+                float gain = Mathf.Min(MaxLoyaltyFromTending, morale.tendedByPlayer * LoyaltyPerTend);
+                if (gain > 0f)
+                {
+                    town.loyalty = Mathf.Clamp(town.loyalty + gain, 0f, 100f);
+                    Messages.Message("OA_MessageLoyaltyFromTending".Translate(town.Label, gain.ToString("0.#")), town, MessageTypeDefOf.PositiveEvent);
+                }
+                if (morale.capitulated && morale.surrenderedKilled == 0)
+                {
+                    SurrenderConsequencesUtility.GiveSparedThoughts(morale.participants);
+                }
                 morale.surrenderedKilled = 0;
                 morale.prisonersTaken = 0;
+                morale.tendedByPlayer = 0;
+                morale.participants.Clear();
             }
 
             foreach (Pawn pawn in map.mapPawns.AllPawnsSpawned.ToList())
@@ -144,6 +164,7 @@ namespace OccupationAnnexation
                 {
                     pawn.mindState.mentalStateHandler.Reset();
                 }
+                TownMilitiaUtility.ReturnWeapons(town, pawn);
                 pawn.GetLord()?.RemovePawn(pawn);
                 if (pawn.Faction != protectorate)
                 {
@@ -179,6 +200,33 @@ namespace OccupationAnnexation
                 town.Store(thing);
             }
             OAMod.DebugLog($"Collected {town.PopulationCount} locals and {items.Count} item stacks into {town.Label}.");
+        }
+
+        /// <summary>
+        /// What the town produces follows what stands in it now: workshops and fields built or lost during a visit count.
+        /// </summary>
+        public static void UpdateProfile(OccupiedSettlement town, Map map, CellRect rect)
+        {
+            List<ProductionShare> updated = DetermineProfile(map, rect);
+            if (updated.Count == 0)
+            {
+                return;
+            }
+            bool changed = updated.Count != town.profile.Count || updated.Any(u =>
+            {
+                ProductionShare old = town.profile.FirstOrDefault(p => p.def == u.def);
+                return old == null || Mathf.Abs(old.share - u.share) >= 0.05f;
+            });
+            town.profile = updated;
+            if (changed)
+            {
+                Messages.Message("OA_MessageProfileChanged".Translate(town.Label, ProfileText(town)), town, MessageTypeDefOf.NeutralEvent);
+            }
+        }
+
+        public static string ProfileText(OccupiedSettlement town)
+        {
+            return town.profile.Select(p => p.def.label + " " + p.share.ToStringPercent()).ToCommaList();
         }
 
         public static CellRect ComputeTownRect(Map map, Faction faction)

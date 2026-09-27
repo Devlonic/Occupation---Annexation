@@ -64,6 +64,18 @@ namespace OccupationAnnexation
         private Pawn medicPatient;
         private Pawn shooter;
         private List<Pawn> medics = new List<Pawn>();
+        private HashSet<Pawn> inBedAtStart = new HashSet<Pawn>();
+        private int consequencePhase;
+        private int tendedBefore;
+        private Pawn doctor;
+        private Pawn playerPatient;
+        private float expectedLoyaltyAfterLeave = -1f;
+        private bool killedDuringStay;
+        private List<Pawn> leavers = new List<Pawn>();
+        private ProductionProfileDef boostedProfile;
+        private float boostedShareBefore;
+        private int housingBefore;
+        private int militiaArmed;
 
         public GameComponent_OAAutoTest(Game game)
         {
@@ -235,6 +247,7 @@ namespace OccupationAnnexation
                     TakePrisoner();
                     break;
                 case 5:
+                    RecordLeaveExpectations();
                     LeaveMap(6);
                     break;
                 case 6:
@@ -278,6 +291,12 @@ namespace OccupationAnnexation
                     break;
                 case 19:
                     TestMedics(now);
+                    break;
+                case 21:
+                    TestTreatmentOfSurrendered(now);
+                    break;
+                case 22:
+                    TestPopulation();
                     break;
                 case 20:
                     // Driven from GameComponentUpdate.
@@ -421,6 +440,11 @@ namespace OccupationAnnexation
                     return;
                 }
                 Note($"Captor {captor.LabelShort} (health {captor.health.summaryHealth.SummaryHealthPercent:P0}, drafted {captor.Drafted}, job {captor.CurJobDef?.defName}) -> {prisonerTarget.LabelShort} at distance {captor.Position.DistanceTo(prisonerTarget.Position):F0}, reachable {captor.CanReach(prisonerTarget, PathEndMode.Touch, Danger.Deadly)}, reservable {captor.CanReserve(prisonerTarget)}");
+                if (prisonerTarget.Position.Fogged(map))
+                {
+                    // Fogged cells get no float menu at all: the player would look into that room first.
+                    FloodFillerFog.FloodUnfog(prisonerTarget.Position, map);
+                }
                 string expectedLabel = "OA_TakePrisoner".Translate(prisonerTarget.LabelShort, prisonerTarget);
                 // Float menus are only built for pawns on the map being looked at.
                 Current.Game.CurrentMap = map;
@@ -485,6 +509,15 @@ namespace OccupationAnnexation
             Check(town.Population.All(p => !Find.WorldPawns.Contains(p)), "population is not duplicated in world pawns");
             Check(town.Population.All(p => ProtectorateUtility.IsProtectorate(p.Faction)), "population belongs to the protectorate");
             Check(town.Population.All(p => !p.InMentalState), "population no longer surrendered");
+            Check(town.Population.All(p => p.equipment?.Primary == null), "townsfolk hold no weapons");
+            if (expectedLoyaltyAfterLeave >= 0f)
+            {
+                Check(Mathf.Abs(town.loyalty - expectedLoyaltyAfterLeave) < 0.01f, $"loyalty after the stay counts kills, prisoners and your doctors' care ({town.loyalty:F1}, expected {expectedLoyaltyAfterLeave:F1})");
+                int spared = leavers.Count(p => p.needs?.mood?.thoughts.memories.GetFirstMemoryOfDef(OA_DefOf.OA_SparedSurrendered) != null);
+                Check(killedDuringStay ? spared == 0 : spared > 0, $"only a conquest without killings earns the 'spared the defeated' memory ({spared} have it, killings {killedDuringStay})");
+            }
+            Note($"Housing {town.housing}, profile {OccupationUtility.ProfileText(town)}");
+            Check(town.housing >= 0, "the town's beds were counted");
             if (town.snapshot != null)
             {
                 var defs = town.snapshot.buildings.GroupBy(b => b.def).OrderByDescending(g => g.Count()).Take(40).Select(g => g.Key + "=" + g.Count());
@@ -643,6 +676,7 @@ namespace OccupationAnnexation
                 Check(locals.Count == populationBeforeSave, $"all locals spawned ({locals.Count}/{populationBeforeSave})");
                 Check(locals.Any(p => p.GetLord()?.LordJob is LordJob_TownLife), "locals follow the town routine");
                 Check(!town.Stock.Any(), "stockpile laid out on the map");
+                BuildDuringVisit(map);
             }
             if (StepTicks % 500 == 0)
             {
@@ -663,8 +697,93 @@ namespace OccupationAnnexation
                 Check(damagedAtStart == 0 || damagedNow < damagedAtStart, "locals repair battle damage");
                 Check(jobHistogram.ContainsKey("LayDown"), "locals sleep at night");
                 Check(jobHistogram.Keys.Any(k => k == "OA_FakeWork" || k == "OA_FakeFarm" || k == "HaulToCell" || k == "OA_Patrol" || k == "LayDown"), "locals do town jobs");
+                TestMilitiaOnMap(map);
                 Next(13);
             }
+        }
+
+        /// <summary>
+        /// As if the player built during the visit: workshops of the town's weakest trade and a few beds.
+        /// Leaving must update what the town produces and how many people it can house.
+        /// </summary>
+        private void BuildDuringVisit(Map map)
+        {
+            housingBefore = town.housing;
+            ProductionProfileDef pick = null;
+            ThingDef workshop = null;
+            float pickShare = float.MaxValue;
+            foreach (ProductionProfileDef profileDef in DefDatabase<ProductionProfileDef>.AllDefsListForReading)
+            {
+                ThingDef building = profileDef.indicatorBuildings.Select(n => DefDatabase<ThingDef>.GetNamedSilentFail(n))
+                    .FirstOrDefault(d => d != null && d.category == ThingCategory.Building && d.size.x <= 3 && d.size.z <= 3);
+                float share = town.profile.FirstOrDefault(p => p.def == profileDef)?.share ?? 0f;
+                if (building != null && profileDef.outputs.Any(o => o.AllowedFor(town.TechLevel)) && share < pickShare)
+                {
+                    pick = profileDef;
+                    workshop = building;
+                    pickShare = share;
+                }
+            }
+            boostedProfile = pick;
+            if (pick != null)
+            {
+                boostedShareBefore = pickShare;
+                int built = 0;
+                while (built < 12 && SpawnInTown(map, workshop, Faction.OfPlayer) != null)
+                {
+                    built++;
+                }
+                Note($"Built {built} x {workshop.defName} for {pick.defName} (share {pickShare:P0})");
+            }
+            int beds = 0;
+            while (beds < 4 && SpawnInTown(map, ThingDefOf.Bed, Faction.OfPlayer) != null)
+            {
+                beds++;
+            }
+            Note($"Built {beds} beds (housing {housingBefore})");
+        }
+
+        private Thing SpawnInTown(Map map, ThingDef def, Faction faction)
+        {
+            foreach (IntVec3 cell in town.townRect.ClipInsideMap(map).Cells.InRandomOrder().Take(600))
+            {
+                CellRect occupied = GenAdj.OccupiedRect(cell, Rot4.North, def.size);
+                if (!occupied.ExpandedBy(1).InBounds(map) || occupied.ExpandedBy(1).Cells.Any(c => !c.Standable(map) || c.GetEdifice(map) != null || c.GetFirstItem(map) != null || c.GetFirstPawn(map) != null))
+                {
+                    continue;
+                }
+                Thing thing = ThingMaker.MakeThing(def, def.MadeFromStuff ? GenStuff.DefaultStuffFor(def) : null);
+                if (def.CanHaveFaction)
+                {
+                    thing.SetFaction(faction);
+                }
+                GenSpawn.Spawn(thing, cell, map, Rot4.North, WipeMode.Vanish);
+                return thing;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// A retake raid while the player is there arms the militia from the weapons lying in the town.
+        /// </summary>
+        private void TestMilitiaOnMap(Map map)
+        {
+            town.militia = true;
+            CellRect rect = town.townRect.ExpandedBy(3).ClipInsideMap(map);
+            int weapons = map.listerThings.ThingsInGroup(ThingRequestGroup.Weapon).Count(t => TownMilitiaUtility.IsMilitiaWeapon(t.def) && rect.Contains(t.Position));
+            if (weapons == 0)
+            {
+                for (int i = 0; i < 2; i++)
+                {
+                    GenPlace.TryPlaceThing(ThingMaker.MakeThing(ThingDef.Named("Gun_Revolver")), rect.CenterCell, map, ThingPlaceMode.Near);
+                }
+                weapons = 2;
+            }
+            List<Pawn> armed = TownMilitiaUtility.ArmMilitia(town, map);
+            militiaArmed = armed.Count;
+            Check(armed.Count > 0 && armed.All(p => p.equipment.Primary != null && p.GetLord()?.LordJob is LordJob_DefendBase),
+                $"the militia takes up arms from the stockpile ({armed.Count} armed, {weapons} weapons in town)");
+            town.militia = false;
         }
 
         private int MissingHitPointsInTown(Map map)
@@ -693,6 +812,14 @@ namespace OccupationAnnexation
             int died = missing.Count(p => p.Dead);
             Check(town.PopulationCount + died == populationBeforeSave, $"population back in the town after the visit ({town.PopulationCount}/{populationBeforeSave}, died {died})");
             Check(town.visits == 1, "visit counted");
+            if (boostedProfile != null)
+            {
+                float after = town.profile.FirstOrDefault(p => p.def == boostedProfile)?.share ?? 0f;
+                Check(after > boostedShareBefore, $"workshops built during the visit change what the town produces ({boostedProfile.label} {boostedShareBefore:P0} -> {after:P0}; {OccupationUtility.ProfileText(town)})");
+            }
+            Check(town.housing > housingBefore, $"beds built during the visit add housing ({housingBefore} -> {town.housing})");
+            Check(town.Population.All(p => p.equipment?.Primary == null) && TownMilitiaUtility.WeaponsInStock(town) >= militiaArmed,
+                $"militia weapons go back to the stockpile ({TownMilitiaUtility.WeaponsInStock(town)} in stock, {militiaArmed} were armed)");
             Next(17);
         }
 
@@ -704,7 +831,9 @@ namespace OccupationAnnexation
             string label = "OA_CommandShowEnemy".Translate(1);
             Check(!town.GetGizmos().OfType<Command>().Any(c => c.defaultLabel == label), "no 'enemies left' gizmo without enemies");
             Pawn fox = PawnGenerator.GeneratePawn(PawnKindDef.Named("Fox_Red"), Faction.OfAncientsHostile);
-            IntVec3 cell = CellFinder.RandomClosewalkCellNear(map.Center, map, 20);
+            // Vanilla ignores enemies shut in fogged rooms; this one must be out in the open.
+            IntVec3 near = map.mapPawns.FreeColonistsSpawned.FirstOrDefault()?.Position ?? map.Center;
+            IntVec3 cell = CellFinder.RandomClosewalkCellNear(near, map, 12, c => !c.Fogged(map));
             GenSpawn.Spawn(fox, cell, map);
             List<Thing> enemies = OccupiedSettlement.RemainingEnemies(map);
             Check(enemies.Contains(fox), "a hostile ruin animal counts as a remaining enemy");
@@ -746,14 +875,28 @@ namespace OccupationAnnexation
 
             // The real chain behind "there are still enemies here": a capitulated pawn goes down later (bleeding out),
             // vanilla drops it from its lord, then it gets back up and vanilla clears its mind.
-            Pawn other = morale.capitulatedPawns.FirstOrDefault(p => p != pawn && morale.StillCapitulated(p));
+            // Armor, drugs or traits (Combat Extended) can keep someone on their feet: take whoever actually goes down.
+            Pawn other = null;
+            foreach (Pawn candidate in morale.capitulatedPawns.Where(p => p != pawn && morale.StillCapitulated(p)).ToList())
+            {
+                if (candidate.Downed)
+                {
+                    candidate.health.RemoveAllHediffs();
+                }
+                HealthUtility.DamageUntilDowned(candidate, allowBleedingWounds: false);
+                if (!candidate.Downed && !candidate.Dead)
+                {
+                    HealthUtility.DamageUntilDowned(candidate, allowBleedingWounds: true);
+                }
+                if (candidate.Downed && !candidate.Dead)
+                {
+                    other = candidate;
+                    break;
+                }
+                Note($"{candidate.LabelShort} did not go down (dead {candidate.Dead}); trying someone else");
+            }
             if (other != null)
             {
-                if (other.Downed)
-                {
-                    other.health.RemoveAllHediffs();
-                }
-                HealthUtility.DamageUntilDowned(other, allowBleedingWounds: false);
                 Check(other.Downed && other.GetLord()?.LordJob is LordJob_Capitulated, "a pawn that goes down after capitulating stays in the capitulated lord");
 
                 // Control: the old behaviour (dropped from the lord, no MakeUndowned patch) makes it an enemy again.
@@ -792,20 +935,22 @@ namespace OccupationAnnexation
         }
 
         /// <summary>
-        /// Once the shooting has stopped for 15 to 40 seconds, those who surrendered and can doctor tend their wounded.
-        /// A real shot next to them sends them back down and restarts the wait; a shot elsewhere on the map does not.
+        /// Once the shooting has stopped for 15 to 40 seconds, those who surrendered and can doctor carry the badly wounded
+        /// into beds and tend their wounded. A real shot next to them sends them back down and restarts the wait;
+        /// a shot elsewhere on the map does not.
         /// </summary>
         private void TestMedics(int now)
         {
             Map map = town.Map;
             MapComponent_SiegeMorale morale = map.GetComponent<MapComponent_SiegeMorale>();
+            Pawn working = medics.FirstOrDefault(p => SurrenderMedicUtility.IsMedicJob(p.CurJobDef));
             Pawn tending = medics.FirstOrDefault(p => p.CurJobDef == JobDefOf.TendPatient);
-            if (medicPhase == 3 || medicPhase == 4 || medicPhase == 9)
+            if (medicPhase == 3 || medicPhase == 4 || medicPhase == 10)
             {
-                if (tending != null && now - ceasefireStart < SurrenderMedicUtility.MinCeasefireTicks && !earlyTendReported)
+                if (working != null && now - ceasefireStart < SurrenderMedicUtility.MinCeasefireTicks && !earlyTendReported)
                 {
                     earlyTendReported = true;
-                    Fail($"{tending.LabelShort} got up to tend only {now - ceasefireStart} ticks into the ceasefire");
+                    Fail($"{working.LabelShort} got up to help the wounded only {now - ceasefireStart} ticks into the ceasefire");
                 }
             }
             switch (medicPhase)
@@ -829,7 +974,16 @@ namespace OccupationAnnexation
                     }
                     break;
                 case 2:
-                    Check(tending == null, "nobody tends right after the shot");
+                    if (now - ceasefireStart == 1)
+                    {
+                        Check(working == null, "nobody helps the wounded right after the shot");
+                    }
+                    if (now - ceasefireStart < 60)
+                    {
+                        // Combat Extended bullets fly: one that hits someone lands a little later and counts too.
+                        break;
+                    }
+                    ceasefireStart = morale.lastAttackTick;
                     if (!FireFarFromCapitulated(map, morale))
                     {
                         Fail("could not fire far from those who surrendered");
@@ -857,65 +1011,80 @@ namespace OccupationAnnexation
                     }
                     break;
                 case 4:
-                    if (tending != null)
+                    if (working != null)
                     {
                         int delay = now - ceasefireStart;
-                        Note($"{tending.LabelShort} tends {tending.CurJob.targetA.Thing?.LabelShort} {delay} ticks ({delay / 60f:F1} s) into the ceasefire, medicine {tending.CurJob.targetB.Thing?.LabelShort ?? "none"}");
+                        Note($"{working.LabelShort} gets up {delay} ticks ({delay / 60f:F1} s) into the ceasefire: {working.CurJobDef.defName} {working.CurJob.targetA.Thing?.LabelShort}");
                         Check(delay >= SurrenderMedicUtility.MinCeasefireTicks && delay <= SurrenderMedicUtility.MaxCeasefireTicks + 31, $"the first medic gets up 15-40 s after the shooting stops ({delay / 60f:F1} s)");
-                        Check(SurrenderUtility.IsSurrendered(tending) && tending.ThreatDisabled(null) && !GenHostility.IsActiveThreatToPlayer(tending), "a medic stays surrendered and is no threat");
-                        Check(tending.equipment?.Primary == null, "a medic is unarmed");
-                        Check(tending.MentalState?.InspectLine == "OA_SurrenderedTendingInspect".Translate(), "a medic's inspect line says it tends the wounded");
-                        Thing medicine = tending.CurJob.targetB.Thing;
-                        Check(medicine != null && medicine.def.IsMedicine && (tending.inventory.Contains(medicine) || tending.carryTracker.CarriedThing == medicine), "a medic uses the medicine it carries");
+                        Check(SurrenderUtility.IsSurrendered(working) && working.ThreatDisabled(null) && !GenHostility.IsActiveThreatToPlayer(working), "a medic stays surrendered and is no threat");
+                        Check(working.equipment?.Primary == null, "a medic is unarmed");
                         CheckReformGizmos(map, "while those who surrendered tend their wounded");
+                        NoteWoundedAndBeds(map, morale, working);
                         tendedAtStart = TendedWounds(morale);
                         medicMark = now;
                         medicPhase = 5;
                     }
                     else if (now - ceasefireStart > SurrenderMedicUtility.MaxCeasefireTicks + 600)
                     {
-                        Fail("no surrendered medic tended the wounded");
+                        Fail("no surrendered medic got up to help the wounded");
                         foreach (Pawn medic in medics)
                         {
-                            Note($"  {medic.LabelShort}: may tend {SurrenderMedicUtility.MayTendNow(medic)}, patient {SurrenderMedicUtility.FindPatient(medic)?.LabelShort}, job {medic.CurJobDef?.defName}, downed {medic.Downed}, surrendered {SurrenderUtility.IsSurrendered(medic)}");
+                            Note($"  {medic.LabelShort}: may tend {SurrenderMedicUtility.MayTendNow(medic)}, to carry {SurrenderMedicUtility.FindWoundedToCarry(medic, out _)?.LabelShort}, patient {SurrenderMedicUtility.FindPatient(medic)?.LabelShort}, job {medic.CurJobDef?.defName}, downed {medic.Downed}, surrendered {SurrenderUtility.IsSurrendered(medic)}");
                         }
                         FinishMedicTest(map);
                     }
                     break;
                 case 5:
-                    if (TendedWounds(morale) > tendedAtStart)
+                    if (tending != null)
                     {
-                        Check(true, $"the wounded got tended ({now - medicMark} ticks, {TendedWounds(morale) - tendedAtStart} wounds; test patient still needs tending {medicPatient.health.HasHediffsNeedingTend()})");
-                        Check(MedicineWithMedics() < medicineGiven, $"the medics' own medicine gets used ({MedicineWithMedics()}/{medicineGiven} left)");
-                        Check(SpawnedMedicine(map) == mapMedicine, $"the town's own medicine is left alone ({SpawnedMedicine(map)}/{mapMedicine})");
-                        if (tending == null && !medicPatient.Dead)
-                        {
-                            // Someone must be at work for the next shot: a fresh wound (not from the player).
-                            medicPatient.TakeDamage(new DamageInfo(DamageDefOf.Cut, 3f));
-                        }
-                        medicMark = now;
+                        Check(tending.MentalState?.InspectLine == "OA_SurrenderedTendingInspect".Translate(), "a medic's inspect line says it tends the wounded");
+                        Thing medicine = tending.CurJob.targetB.Thing;
+                        Check(medicine != null && medicine.def.IsMedicine && (tending.inventory.Contains(medicine) || tending.carryTracker.CarriedThing == medicine), "a medic uses the medicine it carries");
                         medicPhase = 6;
                     }
-                    else if (now - medicMark > 5000)
+                    else if (now - medicMark > 6000)
                     {
-                        Fail($"the wounded were not tended (medic job {tending?.CurJobDef?.defName} {tending?.jobs.curDriver?.CurToilString}, test patient needs tending {medicPatient.health.HasHediffsNeedingTend()})");
+                        Fail($"no surrendered medic started tending (working: {working?.CurJobDef?.defName})");
                         FinishMedicTest(map);
                     }
                     break;
                 case 6:
-                    if (tending != null)
+                    bool tended = TendedWounds(morale) > tendedAtStart;
+                    List<Pawn> bedded = NewlyInBed(morale);
+                    if (tended && bedded.Count > 0)
                     {
-                        if (!FireNear(map, tending.Position))
+                        Check(true, $"the wounded got tended ({now - medicMark} ticks, {TendedWounds(morale) - tendedAtStart} wounds; test patient still needs tending {medicPatient.health.HasHediffsNeedingTend()})");
+                        Check(true, $"medics carried the badly wounded into beds ({bedded.Select(p => p.LabelShort).ToCommaList()})");
+                        Check(MedicineWithMedics() < medicineGiven, $"the medics' own medicine gets used ({MedicineWithMedics()}/{medicineGiven} left)");
+                        Check(SpawnedMedicine(map) == mapMedicine, $"the town's own medicine is left alone ({SpawnedMedicine(map)}/{mapMedicine})");
+                        if (working == null && !medicPatient.Dead)
+                        {
+                            // Someone must be at work for the next shot: a fresh wound (not from the player).
+                            medicPatient.TakeDamage(new DamageInfo(DamageDefOf.Cut, 3f, armorPenetration: 999f));
+                        }
+                        medicMark = now;
+                        medicPhase = 7;
+                    }
+                    else if (now - medicMark > 6000)
+                    {
+                        Fail($"the wounded were not tended ({tended}) or carried into beds ({bedded.Count}) (medic job {working?.CurJobDef?.defName} {working?.jobs.curDriver?.CurToilString}, free bed {medics.Any(m => SurrenderMedicUtility.FindBedFor(m, medicPatient) != null)})");
+                        FinishMedicTest(map);
+                    }
+                    break;
+                case 7:
+                    if (working != null)
+                    {
+                        if (!FireNear(map, working.Position))
                         {
                             Fail("could not fire next to a medic at work");
                             FinishMedicTest(map);
                             break;
                         }
-                        medicPatient = tending.CurJob.targetA.Pawn ?? medicPatient;
+                        medicPatient = working.CurJob.targetA.Pawn ?? medicPatient;
                         mapMedicine = SpawnedMedicine(map);
-                        Note($"Second shot while {tending.LabelShort} is at '{tending.jobs.curDriver?.CurToilString}', carrying {tending.carryTracker.CarriedThing?.LabelShort ?? "nothing"}");
+                        Note($"Second shot while {working.LabelShort} is at {working.CurJobDef.defName} '{working.jobs.curDriver?.CurToilString}', carrying {working.carryTracker.CarriedThing?.LabelShort ?? "nothing"}");
                         medicMark = now;
-                        medicPhase = 7;
+                        medicPhase = 8;
                     }
                     else if (now - medicMark > 600)
                     {
@@ -923,12 +1092,12 @@ namespace OccupationAnnexation
                         FinishMedicTest(map);
                     }
                     break;
-                case 7:
+                case 8:
                     if (morale.lastAttackTick >= medicMark)
                     {
                         ceasefireStart = morale.lastAttackTick;
                         earlyTendReported = false;
-                        medicPhase = 8;
+                        medicPhase = 9;
                     }
                     else if (now - medicMark > 900)
                     {
@@ -936,18 +1105,18 @@ namespace OccupationAnnexation
                         FinishMedicTest(map);
                     }
                     break;
-                case 8:
-                    Check(tending == null, "medics abandon the wounded when shots resume");
-                    Check(medics.Where(p => !p.Dead && !p.Downed).All(p => p.CurJobDef == OA_DefOf.OA_Surrender), "medics lie face down again");
-                    Check(medics.All(p => p.carryTracker?.CarriedThing == null), "medics are not left holding medicine");
-                    Check(SpawnedMedicine(map) == mapMedicine, $"medics pocket their medicine instead of dropping it ({SpawnedMedicine(map)}/{mapMedicine} on the ground)");
-                    medicPhase = 9;
-                    break;
                 case 9:
-                    if (tending != null && now - ceasefireStart >= SurrenderMedicUtility.MinCeasefireTicks)
+                    Check(working == null, "medics abandon the wounded when shots resume");
+                    Check(medics.Where(p => !p.Dead && !p.Downed).All(p => p.CurJobDef == OA_DefOf.OA_Surrender), "medics lie face down again");
+                    Check(medics.All(p => p.carryTracker?.CarriedThing == null), "medics drop whoever they carried and hold no medicine");
+                    Check(SpawnedMedicine(map) == mapMedicine, $"medics pocket their medicine instead of dropping it ({SpawnedMedicine(map)}/{mapMedicine} on the ground)");
+                    medicPhase = 10;
+                    break;
+                case 10:
+                    if (working != null && now - ceasefireStart >= SurrenderMedicUtility.MinCeasefireTicks)
                     {
                         Check(now - ceasefireStart <= SurrenderMedicUtility.MaxCeasefireTicks + 31, $"medics get up again 15-40 s into the new ceasefire ({(now - ceasefireStart) / 60f:F1} s)");
-                        medicPhase = 10;
+                        medicPhase = 11;
                     }
                     else if (now - ceasefireStart > SurrenderMedicUtility.MaxCeasefireTicks + 600)
                     {
@@ -955,18 +1124,62 @@ namespace OccupationAnnexation
                         FinishMedicTest(map);
                     }
                     break;
-                case 10:
+                case 11:
                     // Hurting one of them in any way counts like a shot.
                     Pawn victim = medicPatient.Dead ? medics.First(p => !p.Dead) : medicPatient;
                     victim.TakeDamage(new DamageInfo(DamageDefOf.Blunt, 1f, instigator: shooter));
                     Check(morale.lastAttackTick == now, "hurting one of those who surrendered breaks the ceasefire");
-                    medicPhase = 11;
+                    medicPhase = 12;
                     break;
-                case 11:
-                    Check(tending == null, "medics lie down after one of them is hurt");
+                case 12:
+                    Check(working == null, "medics lie down after one of them is hurt");
                     FinishMedicTest(map);
                     break;
             }
+        }
+
+        private void NoteWoundedAndBeds(Map map, MapComponent_SiegeMorale morale, Pawn medic)
+        {
+            foreach (Pawn pawn in morale.capitulatedPawns.Where(p => p.Spawned && p.Downed))
+            {
+                Note($"  downed {pawn.LabelShort}: faction {pawn.Faction?.Name}, in bed {pawn.InBed()}, patient {SurrenderMedicUtility.IsPatientFor(medic, pawn, needsTend: false)}, "
+                    + $"reach {medic.CanReach(pawn, PathEndMode.ClosestTouch, Danger.Deadly)}, reserve {medic.CanReserve(pawn)}, bed {SurrenderMedicUtility.FindBedFor(medic, pawn)?.Position.ToString() ?? "none"}");
+            }
+            Note("  beds: " + map.listerThings.ThingsInGroup(ThingRequestGroup.Bed).OfType<Building_Bed>().Select(b =>
+                $"{b.def.defName}@{b.Position} {b.Faction?.Name} med {b.Medical} prison {b.ForPrisoners} owners {b.OwnersForReading.Count} free {b.AnyUnoccupiedSleepingSlot} "
+                + $"use {RestUtility.CanUseBedNow(b, medicPatient, checkSocialProperness: false, allowMedBedEvenIfSetToNoCare: true)} reserve {medic.CanReserveAndReach(b, PathEndMode.Touch, Danger.Deadly, b.SleepingSlotsCount, 0)}").ToCommaList());
+            Pawn toCarry = SurrenderMedicUtility.FindWoundedToCarry(medic, out Building_Bed bed);
+            Note($"  {medic.LabelShort} would carry {toCarry?.LabelShort ?? "nobody"} to {bed?.Position.ToString() ?? "no bed"}");
+        }
+
+        private List<Pawn> NewlyInBed(MapComponent_SiegeMorale morale)
+        {
+            return morale.capitulatedPawns.Where(p => !p.Dead && p.Spawned && p.Downed && p.InBed() && !inBedAtStart.Contains(p)).ToList();
+        }
+
+        /// <summary>
+        /// A wooden bed of the town where there is room, reachable for the medics.
+        /// </summary>
+        private Building_Bed SpawnTownBed(Map map)
+        {
+            ThingDef def = ThingDefOf.Bed;
+            foreach (IntVec3 cell in town.townRect.ClipInsideMap(map).Cells.InRandomOrder())
+            {
+                CellRect occupied = GenAdj.OccupiedRect(cell, Rot4.North, def.size);
+                if (!occupied.InBounds(map) || occupied.Cells.Any(c => !c.Standable(map) || c.Fogged(map) || c.GetEdifice(map) != null || c.GetFirstItem(map) != null || c.GetFirstPawn(map) != null))
+                {
+                    continue;
+                }
+                if (!medics[0].CanReach(cell, PathEndMode.Touch, Danger.Deadly))
+                {
+                    continue;
+                }
+                var bed = (Building_Bed)ThingMaker.MakeThing(def, ThingDefOf.WoodLog);
+                bed.SetFaction(town.Faction);
+                GenSpawn.Spawn(bed, cell, map, Rot4.North);
+                return bed;
+            }
+            return null;
         }
 
         private void SetUpMedicTest(Map map, MapComponent_SiegeMorale morale, int now)
@@ -979,7 +1192,7 @@ namespace OccupationAnnexation
                 candidate?.health.RemoveAllHediffs();
                 medics = alive.Where(p => !p.Downed && SurrenderUtility.IsSurrendered(p) && SurrenderMedicUtility.CanDoctor(p)).ToList();
             }
-            medicPatient = alive.Where(p => !medics.Contains(p)).OrderBy(p => p.Downed ? 0 : 1).FirstOrDefault();
+            medicPatient = alive.Where(p => !medics.Contains(p)).OrderBy(p => p.InBed() ? 1 : 0).ThenBy(p => p.Downed ? 0 : 1).FirstOrDefault();
             if (medicPatient == null && medics.Count > 1)
             {
                 medicPatient = medics.Last();
@@ -989,7 +1202,7 @@ namespace OccupationAnnexation
             if (medics.Count == 0 || medicPatient == null || shooter == null)
             {
                 Note($"Cannot test the surrendered medics (medics {medics.Count}, patient {medicPatient?.LabelShort}, shooter {shooter?.LabelShort}); skipping");
-                Next(5);
+                Next(21);
                 return;
             }
             if (!medicPatient.Downed)
@@ -998,9 +1211,19 @@ namespace OccupationAnnexation
             }
             if (!medicPatient.Dead && !medicPatient.health.HasHediffsNeedingTend())
             {
-                medicPatient.TakeDamage(new DamageInfo(DamageDefOf.Cut, 4f));
+                medicPatient.TakeDamage(new DamageInfo(DamageDefOf.Cut, 4f, armorPenetration: 999f));
             }
-            Check(!medicPatient.Dead && medicPatient.Downed && medicPatient.health.HasHediffsNeedingTend(), $"wounded comrade {medicPatient.LabelShort} needs tending");
+            if (medicPatient.InBed())
+            {
+                // Defenders downed in their sleep lie in beds already; the medics must have someone to carry.
+                if (CellFinder.TryFindRandomCellNear(medicPatient.Position, map, 6, c => c.Standable(map) && c.GetFirstPawn(map) == null && c.GetFirstBuilding(map) == null, out IntVec3 floor))
+                {
+                    medicPatient.jobs.StopAll();
+                    medicPatient.Position = floor;
+                    medicPatient.Notify_Teleported();
+                }
+            }
+            Check(!medicPatient.Dead && medicPatient.Downed && !medicPatient.InBed() && medicPatient.health.HasHediffsNeedingTend(), $"wounded comrade {medicPatient.LabelShort} lies on the ground and needs tending");
             // Settlement defenders rarely carry medicine; each medic gets some, the town's stock must stay untouched.
             foreach (Pawn medic in medics)
             {
@@ -1010,6 +1233,12 @@ namespace OccupationAnnexation
             }
             medicineGiven = MedicineWithMedics();
             mapMedicine = SpawnedMedicine(map);
+            inBedAtStart = new HashSet<Pawn>(alive.Where(p => p.InBed()));
+            if (!medics.Any(m => SurrenderMedicUtility.FindBedFor(m, medicPatient) != null))
+            {
+                Building_Bed bed = SpawnTownBed(map);
+                Note(bed != null ? $"No free bed for the wounded: spawned one at {bed.Position}" : "No free bed for the wounded, and none could be spawned");
+            }
             Note($"Medics: {medics.Select(p => p.LabelShort).ToCommaList()}; ceasefire so far {now - morale.CeasefireStartTick} ticks, tending already {medics.Count(p => p.CurJobDef == JobDefOf.TendPatient)}");
 
             ThingDef gunDef = ThingDef.Named("Gun_Revolver");
@@ -1124,7 +1353,256 @@ namespace OccupationAnnexation
                 shooter.equipment.DestroyAllEquipment();
             }
             CheckReformGizmos(map, "after the medic test");
-            Next(5);
+            Next(21);
+        }
+
+        /// <summary>
+        /// The player's doctors tend someone who surrendered (the town remembers it), then one of them is killed:
+        /// colonists react according to their views, and factions at peace lose goodwill.
+        /// </summary>
+        private void TestTreatmentOfSurrendered(int now)
+        {
+            Map map = town.Map;
+            MapComponent_SiegeMorale morale = map.GetComponent<MapComponent_SiegeMorale>();
+            List<Pawn> alive = morale.capitulatedPawns.Where(morale.StillCapitulated).ToList();
+            switch (consequencePhase)
+            {
+                case 0:
+                    doctor = map.mapPawns.FreeColonistsSpawned.FirstOrDefault(p => !p.Downed && !p.InMentalState
+                        && !p.WorkTypeIsDisabled(WorkTypeDefOf.Doctor) && p.health.capacities.CapableOf(PawnCapacityDefOf.Manipulation));
+                    if (doctor?.drafter != null)
+                    {
+                        // An undrafted doctor: vanilla has no way at all for them to tend enemies.
+                        doctor.drafter.Drafted = false;
+                    }
+                    // Someone lying face down but not downed (vanilla offers no way to tend them), preferably not a medic who might get up and walk off.
+                    playerPatient = alive.Where(p => p.Spawned && !p.Downed && SurrenderUtility.IsSurrendered(p))
+                        .OrderBy(p => p.Position.Fogged(map) ? 1 : 0).ThenBy(p => SurrenderMedicUtility.CanDoctor(p) ? 1 : 0).FirstOrDefault()
+                        ?? alive.FirstOrDefault(p => p.Spawned);
+                    if (playerPatient != null && playerPatient.Position.Fogged(map))
+                    {
+                        // Fogged cells get no float menu at all, as for the player: someone has to look into that room first.
+                        FloodFillerFog.FloodUnfog(playerPatient.Position, map);
+                    }
+                    if (doctor == null || playerPatient == null)
+                    {
+                        Note($"Cannot test tending by your doctors (doctor {doctor?.LabelShort}, patient {playerPatient?.LabelShort}); skipping");
+                        consequencePhase = 2;
+                        break;
+                    }
+                    if (!playerPatient.health.HasHediffsNeedingTend())
+                    {
+                        playerPatient.TakeDamage(new DamageInfo(DamageDefOf.Cut, 3f, armorPenetration: 999f));
+                    }
+                    // The surrendered medics wait out a fresh ceasefire, so the colony's doctor is the one who tends.
+                    morale.Notify_CeasefireBroken();
+                    Thing herbal = ThingMaker.MakeThing(ThingDefOf.MedicineHerbal);
+                    herbal.stackCount = 2;
+                    doctor.inventory.innerContainer.TryAdd(herbal);
+                    IntVec3 near = CellFinder.StandableCellNear(playerPatient.Position, map, 3f);
+                    if (near.IsValid)
+                    {
+                        doctor.jobs.StopAll();
+                        doctor.Position = near;
+                        doctor.Notify_Teleported();
+                    }
+                    Current.Game.CurrentMap = map;
+                    string prefix = "Tend".Translate(playerPatient);
+                    string without = "WithoutMedicine".Translate();
+                    List<FloatMenuOption> options = FloatMenuMakerMap.ChoicesAtFor(playerPatient.DrawPos, doctor);
+                    FloatMenuOption tend = options.FirstOrDefault(o => o.Label.StartsWith(prefix) && o.action != null && !o.Label.Contains(without));
+                    if (tend == null)
+                    {
+                        Note("Float menu options: " + options.Select(o => o.Label).ToCommaList());
+                    }
+                    Check(tend != null, $"the float menu offers tending {playerPatient.LabelShort}, who surrendered (downed {playerPatient.Downed})");
+                    Check(options.Any(o => o.Label.StartsWith(prefix) && o.Label.Contains(without)) || tend?.Label.Contains(without) == true, "tending someone who surrendered can be done without medicine");
+                    tendedBefore = morale.tendedByPlayer;
+                    doctor.jobs.debugLog = true;
+                    tend?.action();
+                    medicMark = now;
+                    consequencePhase = 1;
+                    break;
+                case 1:
+                    if ((now - medicMark) % 600 == 0)
+                    {
+                        // Keep the surrendered medics down so the colony's doctor is the one who tends.
+                        morale.Notify_CeasefireBroken();
+                    }
+                    if (now - medicMark == 1 || (now - medicMark) % 500 == 0)
+                    {
+                        Note($"  doctor {doctor.LabelShort}: job {doctor.CurJobDef?.defName} {doctor.CurJob?.targetA.Thing?.LabelShort} toil '{doctor.jobs.curDriver?.CurToilString}', at {doctor.Position}; "
+                            + $"patient at {playerPatient.Position}, job {playerPatient.CurJobDef?.defName}, needs tending {playerPatient.health.HasHediffsNeedingTend()}, capitulated {SurrenderUtility.HasCapitulated(playerPatient)}");
+                    }
+                    if (now - medicMark == 30)
+                    {
+                        doctor.jobs.debugLog = false;
+                    }
+                    if (morale.tendedByPlayer > tendedBefore)
+                    {
+                        Check(true, $"your doctor tended someone who surrendered ({now - medicMark} ticks)");
+                        doctor.jobs.debugLog = false;
+                        consequencePhase = 2;
+                    }
+                    else if (now - medicMark > 4000)
+                    {
+                        Fail($"your doctor did not tend someone who surrendered (job {doctor.CurJobDef?.defName} {doctor.jobs.curDriver?.CurToilString}, patient needs tending {playerPatient.health.HasHediffsNeedingTend()})");
+                        doctor.jobs.debugLog = false;
+                        consequencePhase = 2;
+                    }
+                    break;
+                case 2:
+                    TestKillingSurrendered(map, morale, alive);
+                    Next(5);
+                    break;
+            }
+        }
+
+        private void TestKillingSurrendered(Map map, MapComponent_SiegeMorale morale, List<Pawn> alive)
+        {
+            Pawn killer = doctor ?? map.mapPawns.FreeColonistsSpawned.FirstOrDefault();
+            Pawn victim = alive.FirstOrDefault(p => p != playerPatient && SurrenderUtility.IsSurrendered(p));
+            if (killer == null || victim == null)
+            {
+                Note("Nobody to test killing someone who surrendered; skipping");
+                return;
+            }
+            var goodwillBefore = new Dictionary<Faction, int>();
+            foreach (Faction faction in Find.FactionManager.AllFactionsListForReading)
+            {
+                if (!faction.IsPlayer && !faction.Hidden && !faction.defeated && faction != victim.Faction && !ProtectorateUtility.IsProtectorate(faction)
+                    && faction.def.humanlikeFaction && !faction.HostileTo(Faction.OfPlayer))
+                {
+                    goodwillBefore[faction] = faction.PlayerGoodwill;
+                }
+            }
+            int killedBefore = morale.surrenderedKilled;
+            victim.Kill(new DamageInfo(DamageDefOf.Cut, 99f, instigator: killer));
+            Check(victim.Dead && morale.surrenderedKilled == killedBefore + 1, "killing someone who surrendered is counted");
+
+            var views = new List<string>();
+            bool thoughtsRight = true;
+            foreach (Pawn colonist in map.mapPawns.FreeColonistsSpawned)
+            {
+                SurrenderConsequencesUtility.View view = SurrenderConsequencesUtility.ViewOf(colonist);
+                int stage = SurrenderConsequencesUtility.KilledStage(view);
+                bool has = colonist.needs.mood.thoughts.memories.Memories.Any(m => m.def == OA_DefOf.OA_KilledSurrendered && m.CurStageIndex == stage);
+                bool any = colonist.needs.mood.thoughts.memories.Memories.Any(m => m.def == OA_DefOf.OA_KilledSurrendered);
+                thoughtsRight &= stage >= 0 ? has : !any;
+                views.Add($"{colonist.LabelShort}: {view}{(stage >= 0 ? " " + (has ? "has thought" : "NO thought") : "")}");
+            }
+            Note("Views on killing the surrendered: " + views.ToCommaList());
+            Check(thoughtsRight, "colonists react to the killing according to their ideoligion and traits");
+
+            if (goodwillBefore.Count == 0)
+            {
+                Note("No faction at peace with the colony; goodwill not checked");
+            }
+            else
+            {
+                Note("Goodwill: " + goodwillBefore.Select(kv => $"{kv.Key.Name} {kv.Value} -> {kv.Key.PlayerGoodwill}").ToCommaList());
+                Check(goodwillBefore.All(kv => kv.Key.PlayerGoodwill < kv.Value), "factions at peace lose goodwill over the killing");
+            }
+
+            // The other way round: sparing everyone. Checked directly, since this stay did have a killing.
+            Pawn spared = map.mapPawns.FreeColonistsSpawned.FirstOrDefault(p => SurrenderConsequencesUtility.SparedStage(SurrenderConsequencesUtility.ViewOf(p)) >= 0);
+            if (spared != null)
+            {
+                SurrenderConsequencesUtility.GiveSparedThoughts(new[] { spared });
+                Check(spared.needs.mood.thoughts.memories.GetFirstMemoryOfDef(OA_DefOf.OA_SparedSurrendered) != null, "sparing the defeated gives a good memory");
+                spared.needs.mood.thoughts.memories.RemoveMemoriesOfDef(OA_DefOf.OA_SparedSurrendered);
+            }
+        }
+
+        /// <summary>
+        /// What leaving the conquered town should do to its loyalty: kills and prisoners cost, tending by your doctors helps.
+        /// </summary>
+        private void RecordLeaveExpectations()
+        {
+            MapComponent_SiegeMorale morale = town.Map?.GetComponent<MapComponent_SiegeMorale>();
+            if (morale == null)
+            {
+                return;
+            }
+            float loss = morale.surrenderedKilled * OAMod.Settings.loyaltyLossPerKilledSurrendered + morale.prisonersTaken * 2f;
+            float gain = Mathf.Min(OccupationUtility.MaxLoyaltyFromTending, morale.tendedByPlayer * OccupationUtility.LoyaltyPerTend);
+            expectedLoyaltyAfterLeave = Mathf.Clamp(Mathf.Clamp(town.loyalty - loss, 0f, 100f) + gain, 0f, 100f);
+            killedDuringStay = morale.surrenderedKilled > 0;
+            leavers = town.Map.mapPawns.FreeColonistsSpawned.ToList();
+            Note($"Leaving: loyalty {town.loyalty:F1}, killed {morale.surrenderedKilled}, prisoners {morale.prisonersTaken}, tended by your doctors {morale.tendedByPlayer} -> expected {expectedLoyaltyAfterLeave:F1}");
+        }
+
+        /// <summary>
+        /// Newcomers until the beds are full, volunteers for the colony, and the militia's weight in a fight.
+        /// </summary>
+        private void TestPopulation()
+        {
+            town.loyalty = 100f;
+            int housing = PopulationUtility.Housing(town);
+            int population = town.PopulationCount;
+            Note($"Population {population}, housing {housing}, growth chance {PopulationUtility.GrowthChancePerDay(town):P0} a day");
+            if (population < housing)
+            {
+                Check(PopulationUtility.GrowthChancePerDay(town) > 0f, "a loyal town with free beds can grow");
+                Pawn newcomer = PopulationUtility.AddNewcomer(town);
+                Check(town.PopulationCount == population + 1 && town.Population.Contains(newcomer), "a newcomer settles in the town");
+                Check(newcomer.Faction == town.Faction && newcomer.equipment?.Primary == null && !newcomer.inventory.innerContainer.Any() && !newcomer.IsWorldPawn(),
+                    "the newcomer is an unarmed townsperson held by the town");
+            }
+            int savedHousing = town.housing;
+            town.housing = town.PopulationCount;
+            Check(PopulationUtility.GrowthChancePerDay(town) == 0f, "no growth once every bed is taken");
+            town.housing = savedHousing;
+            town.loyalty = 40f;
+            Check(PopulationUtility.GrowthChancePerDay(town) == 0f, "no growth in a town that is not loyal enough");
+            town.loyalty = 100f;
+
+            if (caravan == null || caravan.Destroyed)
+            {
+                caravan = Find.WorldObjects.Caravans.FirstOrDefault(c => c.Faction == Faction.OfPlayer && c.Tile == town.Tile);
+            }
+            if (caravan == null)
+            {
+                Fail("No caravan at the town to test recruiting");
+            }
+            else
+            {
+                string label = "OA_CommandRecruit".Translate();
+                Command recruitCommand = town.GetCaravanGizmos(caravan).OfType<Command>().FirstOrDefault(c => c.defaultLabel == label);
+                Check(recruitCommand != null && !recruitCommand.Disabled, $"an annexed, loyal town offers a volunteer ({recruitCommand?.disabledReason})");
+                Pawn volunteer = PopulationUtility.RecruitCandidates(town).FirstOrDefault();
+                if (volunteer != null)
+                {
+                    int before = town.PopulationCount;
+                    float loyaltyBefore = town.loyalty;
+                    PopulationUtility.Recruit(town, volunteer, caravan);
+                    Check(volunteer.Faction == Faction.OfPlayer && volunteer.IsColonist && caravan.PawnsListForReading.Contains(volunteer) && volunteer.IsWorldPawn(),
+                        $"{volunteer.LabelShort} joins the colony and the caravan");
+                    Check(town.PopulationCount == before - 1 && Mathf.Abs(town.loyalty - (loyaltyBefore - PopulationUtility.RecruitLoyaltyCost)) < 0.01f, "recruiting takes a townsperson and some loyalty");
+                    recruitCommand = town.GetCaravanGizmos(caravan).OfType<Command>().FirstOrDefault(c => c.defaultLabel == label);
+                    Check(recruitCommand != null && recruitCommand.Disabled, $"the next volunteer has to wait ({recruitCommand?.disabledReason})");
+                }
+            }
+
+            string militiaLabel = "OA_CommandMilitia".Translate();
+            Check(town.GetGizmos().OfType<Command_Toggle>().Any(c => c.defaultLabel == militiaLabel), "the town has a militia toggle");
+            if (TownMilitiaUtility.WeaponsInStock(town) == 0)
+            {
+                town.Store(ThingMaker.MakeThing(ThingDef.Named("Gun_Revolver"), null));
+            }
+            town.militia = false;
+            float withoutMilitia = TownEventsUtility.DefenseStrength(town);
+            float outputWithout = EconomyUtility.ProductionEfficiency(town);
+            town.militia = true;
+            float withMilitia = TownEventsUtility.DefenseStrength(town);
+            Note($"Militia of {TownMilitiaUtility.MilitiaSize(town)} ({TownMilitiaUtility.WeaponsInStock(town)} weapons in stock): defense {withoutMilitia:F2} -> {withMilitia:F2}");
+            Check(withMilitia > withoutMilitia, "the militia strengthens the town's defense");
+            Check(EconomyUtility.ProductionEfficiency(town) < outputWithout, "training the militia costs production");
+            town.loyalty = TownMilitiaUtility.DisbandLoyalty - 5f;
+            TownMilitiaUtility.DailyCheck(town);
+            Check(!town.militia, "a disloyal town disbands its militia");
+            town.loyalty = 90f;
+            Next(15);
         }
 
         private void TestGarrisonAndGifts()
@@ -1137,7 +1615,7 @@ namespace OccupationAnnexation
             if (guard == null || caravan.PawnsListForReading.Count(p => p.IsFreeColonist && !p.Downed) < 2)
             {
                 Note("Not enough colonists in the caravan to test the garrison; skipping");
-                Next(15);
+                Next(22);
                 return;
             }
             float loyaltyBefore = town.loyalty;
@@ -1160,7 +1638,7 @@ namespace OccupationAnnexation
             Check(town.GarrisonCount == 0, "garrison withdrawn");
             Check(Find.WorldObjects.Caravans.Any(c => c.PawnsListForReading.Contains(guard)), "withdrawn garrison forms a caravan");
             Check(Find.WorldPawns.Contains(guard), "withdrawn colonist is a world pawn again");
-            Next(15);
+            Next(22);
         }
 
         private void TestEvents()

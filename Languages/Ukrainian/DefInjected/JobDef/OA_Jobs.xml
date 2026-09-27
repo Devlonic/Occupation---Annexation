@@ -2,6 +2,7 @@
 <LanguageData>
 	<OA_Surrender.reportString>лежить обличчям донизу, здався.</OA_Surrender.reportString>
 	<OA_TakeSurrenderedPrisoner.reportString>бере в полон: TargetA.</OA_TakeSurrenderedPrisoner.reportString>
+	<OA_CarryWoundedToBed.reportString>несе TargetA до ліжка.</OA_CarryWoundedToBed.reportString>
 	<OA_FakeWork.reportString>працює за TargetA.</OA_FakeWork.reportString>
 	<OA_FakeFarm.reportString>доглядає TargetA.</OA_FakeFarm.reportString>
 	<OA_Patrol.reportString>стоїть на варті.</OA_Patrol.reportString>

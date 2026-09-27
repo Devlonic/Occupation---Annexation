@@ -14,9 +14,11 @@ namespace OccupationAnnexation
         public static readonly Type CompSuppressableType = AccessTools.TypeByName("CombatExtended.CompSuppressable");
         public static readonly Type AmmoDefType = AccessTools.TypeByName("CombatExtended.AmmoDef");
         public static readonly Type VerbLaunchProjectileType = AccessTools.TypeByName("CombatExtended.Verb_LaunchProjectileCE");
+        public static readonly Type CompAmmoUserType = AccessTools.TypeByName("CombatExtended.CompAmmoUser");
 
         private static readonly FieldInfo isSuppressedField;
         private static readonly MethodInfo isHunkeringGetter;
+        private static readonly MethodInfo resetAmmoCount = CompAmmoUserType == null ? null : AccessTools.Method(CompAmmoUserType, "ResetAmmoCount");
 
         public static bool Active => CompSuppressableType != null;
 
@@ -80,6 +82,33 @@ namespace OccupationAnnexation
         public static bool IsProjectileVerb(Verb verb)
         {
             return VerbLaunchProjectileType != null && VerbLaunchProjectileType.IsInstanceOfType(verb);
+        }
+
+        /// <summary>
+        /// A gun taken from a stockpile has an empty magazine under CE; the militia gets one full magazine.
+        /// </summary>
+        public static void TopUpMagazine(ThingWithComps weapon)
+        {
+            if (CompAmmoUserType == null || weapon == null)
+            {
+                return;
+            }
+            foreach (ThingComp comp in weapon.AllComps)
+            {
+                if (!CompAmmoUserType.IsInstanceOfType(comp))
+                {
+                    continue;
+                }
+                try
+                {
+                    resetAmmoCount?.Invoke(comp, new object[] { null });
+                }
+                catch (Exception e)
+                {
+                    Log.ErrorOnce("[Occupation & Annexation] Failed to load a CE magazine: " + e, 0x4F41_0002);
+                }
+                return;
+            }
         }
     }
 }

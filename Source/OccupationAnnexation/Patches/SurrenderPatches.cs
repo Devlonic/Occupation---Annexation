@@ -68,12 +68,39 @@ namespace OccupationAnnexation
             {
                 return true;
             }
-            if (def == JobDefOf.TendPatient && SurrenderMedicUtility.MayTendNow(___pawn))
+            if (SurrenderMedicUtility.IsMedicJob(def) && SurrenderMedicUtility.MayTendNow(___pawn))
             {
                 return true;
             }
-            OAMod.DebugLog($"Blocked job {def.defName} for surrendered {___pawn}.");
+            if (OAMod.Settings.debugLogging)
+            {
+                int key = Gen.HashCombineInt(___pawn.thingIDNumber, def.shortHash);
+                int now = Find.TickManager.TicksGame;
+                if (!lastLogged.TryGetValue(key, out int tick) || now - tick > GenDate.TicksPerHour)
+                {
+                    lastLogged[key] = now;
+                    OAMod.DebugLog($"Blocked job {def.defName} for surrendered {___pawn}.");
+                }
+            }
             return false;
+        }
+
+        private static readonly Dictionary<int, int> lastLogged = new Dictionary<int, int>();
+    }
+
+    /// <summary>
+    /// A medic whose way is blocked by a colonist does not attack them (vanilla's reaction to a blocked path);
+    /// it gives up that errand instead and thinks again.
+    /// </summary>
+    [HarmonyPatch(typeof(Pawn), nameof(Pawn.CanAttackWhenPathingBlocked), MethodType.Getter)]
+    public static class Patch_Pawn_CanAttackWhenPathingBlocked
+    {
+        public static void Postfix(Pawn __instance, ref bool __result)
+        {
+            if (__result && SurrenderUtility.IsSurrendered(__instance))
+            {
+                __result = false;
+            }
         }
     }
 
@@ -108,6 +135,44 @@ namespace OccupationAnnexation
                 morale.surrenderedKilled++;
             }
             SurrenderMedicUtility.Notify_PlayerAttack(__instance.MapHeld, __instance);
+            SurrenderConsequencesUtility.Notify_SurrenderedKilled(__instance);
+        }
+    }
+
+    /// <summary>
+    /// Vanilla tends people who lie on the ground from their own cell (ClosestTouch), and only the downed are handled
+    /// consistently. Someone lying face down who is not downed is tended from next to them instead.
+    /// </summary>
+    [HarmonyPatch(typeof(JobDriver_TendPatient), nameof(JobDriver_TendPatient.Notify_Starting))]
+    public static class Patch_JobDriver_TendPatient_Notify_Starting
+    {
+        public static void Postfix(JobDriver_TendPatient __instance, ref PathEndMode ___pathEndMode)
+        {
+            Pawn patient = __instance.job.targetA.Pawn;
+            if (patient != null && patient != __instance.pawn && !patient.Downed && !patient.InBed() && SurrenderUtility.IsSurrendered(patient))
+            {
+                ___pathEndMode = PathEndMode.Touch;
+            }
+        }
+    }
+
+    /// <summary>
+    /// The future town remembers every time the player's doctors tended those who capitulated.
+    /// </summary>
+    [HarmonyPatch(typeof(TendUtility), nameof(TendUtility.DoTend))]
+    public static class Patch_TendUtility_DoTend
+    {
+        public static void Postfix(Pawn doctor, Pawn patient)
+        {
+            if (doctor?.Faction != Faction.OfPlayer || patient == null || !SurrenderUtility.HasCapitulated(patient))
+            {
+                return;
+            }
+            MapComponent_SiegeMorale morale = patient.MapHeld.GetComponent<MapComponent_SiegeMorale>();
+            if (morale != null)
+            {
+                morale.tendedByPlayer++;
+            }
         }
     }
 
@@ -156,6 +221,15 @@ namespace OccupationAnnexation
             validator = t => t.Thing is Pawn p && SurrenderUtility.IsSurrendered(p)
         };
 
+        private static readonly TargetingParameters CapitulatedTargets = new TargetingParameters
+        {
+            canTargetPawns = true,
+            canTargetBuildings = false,
+            canTargetItems = false,
+            mapObjectTargetsMustBeAutoAttackable = false,
+            validator = t => t.Thing is Pawn p && SurrenderUtility.HasCapitulated(p)
+        };
+
         public static void Postfix(Vector3 clickPos, Pawn pawn, List<FloatMenuOption> opts)
         {
             if (pawn == null || !pawn.IsColonistPlayerControlled || pawn.Downed)
@@ -165,6 +239,14 @@ namespace OccupationAnnexation
             if (!pawn.health.capacities.CapableOf(PawnCapacityDefOf.Manipulation))
             {
                 return;
+            }
+            foreach (LocalTargetInfo target in GenUI.TargetsAt(clickPos, CapitulatedTargets, thingsOnly: true))
+            {
+                // Drafted doctors already get vanilla's "Tend" for anyone who is down.
+                if (target.Thing is Pawn patient && patient != pawn && !(pawn.Drafted && patient.Downed))
+                {
+                    AddTendOptions(pawn, patient, opts);
+                }
             }
             foreach (LocalTargetInfo target in GenUI.TargetsAt(clickPos, SurrenderedTargets, thingsOnly: true))
             {
@@ -185,6 +267,56 @@ namespace OccupationAnnexation
                 }, MenuOptionPriority.High, null, victim);
                 opts.Add(FloatMenuUtility.DecoratePrioritizedTask(option, pawn, victim));
             }
+        }
+
+        /// <summary>
+        /// Vanilla only lets drafted doctors tend enemies who are down. Those who capitulated can be tended by anyone,
+        /// with the cheapest medicine at hand or without.
+        /// </summary>
+        private static void AddTendOptions(Pawn doctor, Pawn patient, List<FloatMenuOption> opts)
+        {
+            if (!patient.health.HasHediffsNeedingTend())
+            {
+                opts.Add(new FloatMenuOption("CannotTend".Translate(patient) + ": " + "TendingNotRequired".Translate(patient), null));
+                return;
+            }
+            if (doctor.WorkTypeIsDisabled(WorkTypeDefOf.Doctor))
+            {
+                opts.Add(new FloatMenuOption("CannotTend".Translate(patient) + ": " + "CannotPrioritizeWorkTypeDisabled".Translate(WorkTypeDefOf.Doctor.gerundLabel), null));
+                return;
+            }
+            if (!doctor.CanReach(patient, PathEndMode.ClosestTouch, Danger.Deadly))
+            {
+                opts.Add(new FloatMenuOption("CannotTend".Translate(patient) + ": " + "NoPath".Translate().CapitalizeFirst(), null));
+                return;
+            }
+            Thing medicine = SurrenderMedicUtility.FindCheapestMedicine(doctor, patient);
+            string with = medicine != null ? medicine.LabelNoCount : "WithoutMedicine".Translate().ToString();
+            var option = new FloatMenuOption("Tend".Translate(patient) + " (" + with + ")", () => OrderTend(doctor, patient, medicine), MenuOptionPriority.Default, null, patient);
+            opts.Add(FloatMenuUtility.DecoratePrioritizedTask(option, doctor, patient));
+            if (medicine != null)
+            {
+                opts.Add(new FloatMenuOption("Tend".Translate(patient) + " (" + "WithoutMedicine".Translate() + ")", () => OrderTend(doctor, patient, null), MenuOptionPriority.Default, null, patient));
+            }
+        }
+
+        public static void OrderTend(Pawn doctor, Pawn patient, Thing medicine)
+        {
+            Job job;
+            if (medicine == null)
+            {
+                job = JobMaker.MakeJob(JobDefOf.TendPatient, patient);
+            }
+            else if (medicine.ParentHolder is Pawn_InventoryTracker inventory)
+            {
+                job = JobMaker.MakeJob(JobDefOf.TendPatient, patient, medicine, inventory.pawn);
+            }
+            else
+            {
+                job = JobMaker.MakeJob(JobDefOf.TendPatient, patient, medicine);
+            }
+            job.count = 1;
+            doctor.jobs.TryTakeOrderedJob(job, JobTag.Misc);
         }
     }
 

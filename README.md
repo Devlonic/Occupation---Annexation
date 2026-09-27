@@ -12,10 +12,20 @@ surrender; occupy the town, win its loyalty, annex it, collect its taxes and vis
    ignore them. Right-click one to **take them prisoner** on the spot. Settlement
    defenders no longer panic-flee off the map (configurable).
    Once no one has fired at them for 15–40 seconds (each medic waits a different time),
-   surrendered pawns who can doctor get up and **tend their wounded** who weren't taken
-   prisoner. They use only the medicine they carry, then lie down again. Fire at them or
-   near them, or hurt one of them, and every medic abandons the wounded, lies face down
-   and the wait starts over.
+   surrendered pawns who can doctor get up, **carry the downed into the town's beds** and
+   **tend their wounded** who weren't taken prisoner: bleeding first, then carrying, then
+   the rest. They use only the medicine they carry and may pass the town's doors, then
+   lie down again. Fire at them or near them, or hurt one of them, and every medic drops
+   whoever they carry, lies face down and the wait starts over. Someone a colonist is
+   coming for (to take prisoner or to tend) stays down and waits.
+   - **Your doctors can tend them too**: right-click someone who surrendered, *Tend*
+     (with the cheapest medicine at hand, or without). The town remembers it: +1.5
+     loyalty per treatment, up to +15, when you leave.
+   - **Consequences.** Killing someone who surrendered upsets the colonists who see it,
+     according to their ideoligion's view of executions (without Ideology: by traits;
+     psychopaths don't care, bloodlust approves). Factions at peace with you lose
+     goodwill (configurable). Leave without killing anyone who surrendered and the
+     colonists who took part get a good memory, *spared the defeated*.
 2. **Occupation.** Instead of becoming ruins, the settlement becomes a town of your
    **Protectorate**, a single permanently allied faction created on first use. Its
    buildings and turrets switch sides. When your people leave, the survivors stay as the
@@ -25,8 +35,10 @@ surrender; occupy the town, win its loyalty, annex it, collect its taxes and vis
    Killing people who surrendered or locals, and taking prisoners, costs loyalty.
 4. **Annexation.** At the configured loyalty and minimum days, press **Annex**.
    Annexed towns work at full strength and their loyalty settles at a content level.
-5. **Economy.** Towns produce goods every day, depending on what they had when captured:
+5. **Economy.** Towns produce goods every day, depending on what stands in them:
    fields → crops, kitchens → provisions, smithies → steel and components, and so on.
+   The mix is worked out again every time you leave the town map, so workshops and
+   fields you build (or lose) during a visit change what the town produces.
    Taxes always bring silver. Output depends on working adults, loyalty, tax level, and
    occupied vs. annexed. The stockpile has a limit per inhabitant. Profiles are XML
    (`Defs/Economy/OA_ProductionProfiles.xml`) and can be extended by other mods.
@@ -44,10 +56,21 @@ surrender; occupy the town, win its loyalty, annex it, collect its taxes and vis
    - guards patrolling, socialising in the evening, sleeping in their beds at night.
 
    Needs are frozen while they live on schedule.
-8. **Events.** Disloyal towns may **rise up**; a garrison can put the uprising down. Former
+8. **Population.**
+   - **Housing** is the number of beds in the town as you last left it.
+   - **Newcomers**: towns with loyalty 50+ slowly gain people until every bed is taken
+     (faster when annexed). Build beds during a visit to let a town grow.
+   - **Volunteers**: an annexed town with loyalty 60+ lets a townsperson join your colony
+     and leave with your caravan (*Recruit a volunteer*): -8 loyalty, one every 5 days.
+   - **Militia** (town gizmo, loyalty 40+): as many adults as there are weapons in the
+     stockpile train to defend the town. It costs 10% of production and disbands below
+     loyalty 25. In an abstract retake fight it adds to the defense (and may lose
+     someone); with you on site, the militia takes the weapons lying in town and fights
+     alongside you. Townsfolk hand their weapons back to the stockpile when you leave.
+9. **Events.** Disloyal towns may **rise up**; a garrison can put the uprising down. Former
    owners may try to **retake** the town: you get two days of warning. With you on site, it
-   is a real raid on the town map; otherwise it is resolved from garrison and loyalty. A
-   lost town becomes a hostile settlement again.
+   is a real raid on the town map; otherwise it is resolved from garrison, loyalty and
+   militia. A lost town becomes a hostile settlement again.
 
 ## Compatibility
 
@@ -59,6 +82,33 @@ surrender; occupy the town, win its loyalty, annex it, collect its taxes and vis
   - CAI's combat reasoning skips surrendered pawns.
 - The visit map generator does not inherit `MapCommonBase`, so mods that add scatter steps
   there (e.g. Real Ruins) do not touch towns.
+
+## Ideas for later
+
+Not implemented yet; roughly from most to least promising.
+
+- **Demand surrender.** A caravan next to a hostile settlement, or a button during an
+  assault, demands capitulation. The chance depends on the defenders' morale (already
+  tracked), the strength of your force and the negotiator's Social skill. A refusal
+  briefly raises their morale. A way to take a town without a fight.
+- **Raiders capitulate too.** The same morale system on your own map: when a raid breaks,
+  part of it surrenders and lies down instead of fleeing. More prisoners, fewer
+  runaways. Needs careful balancing, behind a setting.
+- **Governing a town.** A governor (a colonist or a local) whose Social and Intellectual
+  skills affect loyalty and output. Edicts with trade-offs between loyalty, production and
+  the risk of an uprising: curfew, festivals, rationing, conscription.
+- **An underground in disloyal towns.** A resistance cell sabotages production; during a
+  visit you can find and arrest its ringleaders.
+- **Requests from townsfolk during visits.** Fix the generator, drive off animals nearby,
+  find a thief: loyalty for help.
+- **Risky deliveries.** Caravans with goods can be ambushed on the way; the garrison can
+  send an escort.
+- **Regional influence.** Several towns in one region make weak neighbouring factions
+  offer tribute or join the protectorate peacefully.
+- **Integrations.**
+  - Hospitality: townsfolk visit the colony as guests and can stay.
+  - Vehicle Framework: industrial towns deliver by truck.
+  - Royalty: the Empire grants honor for pacified towns.
 
 ## Development
 
@@ -92,13 +142,17 @@ optionally CE/CAI, and this mod. Set `autosaveIntervalDays` > 0 in its `Prefs.xm
 
 The test covers:
 - the assault, capitulation, taking a prisoner and occupation;
-- surrendered medics: the 15–40 s ceasefire, tending, real shots near them and far away,
-  and hurting one of them;
-- leaving the map, and a save/load round-trip;
+- surrendered medics: the 15–40 s ceasefire, carrying the downed into beds, tending,
+  real shots near them and far away, and hurting one of them;
+- your doctor tending someone who surrendered; killing one of them (colonists'
+  thoughts by their views, goodwill), sparing them;
+- leaving the map (loyalty from kills, prisoners and tending), and a save/load round-trip;
 - annexing, production, caravan and drop-pod deliveries;
 - opening every window, tab and gizmo;
-- a full-day visit with checks on snapshot restoration and town jobs;
-- a second leave;
+- a full-day visit with checks on snapshot restoration and town jobs; building
+  workshops and beds, arming the militia;
+- a second leave: new production mix, more housing, weapons back in the stockpile;
+- newcomers, volunteers, militia strength and disbanding;
 - retake and uprising.
 
 It writes the PASS/FAIL report and counts every error logged during the run.
