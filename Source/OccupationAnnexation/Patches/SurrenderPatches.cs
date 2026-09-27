@@ -52,7 +52,7 @@ namespace OccupationAnnexation
 
     /// <summary>
     /// Universal guard: no mod (CAI 5000, CE, vanilla duties) may hand a surrendered pawn a new job,
-    /// except lying down and involuntary ones.
+    /// except lying down, involuntary ones and tending the wounded during a ceasefire.
     /// </summary>
     [HarmonyPatch(typeof(Pawn_JobTracker), nameof(Pawn_JobTracker.StartJob))]
     public static class Patch_Pawn_JobTracker_StartJob
@@ -65,6 +65,10 @@ namespace OccupationAnnexation
             }
             JobDef def = newJob.def;
             if (def == OA_DefOf.OA_Surrender || def == JobDefOf.Vomit || def == JobDefOf.Wait_Downed || def == JobDefOf.Wait_MaintainPosture)
+            {
+                return true;
+            }
+            if (def == JobDefOf.TendPatient && SurrenderMedicUtility.MayTendNow(___pawn))
             {
                 return true;
             }
@@ -102,6 +106,40 @@ namespace OccupationAnnexation
             if (morale != null)
             {
                 morale.surrenderedKilled++;
+            }
+            SurrenderMedicUtility.Notify_PlayerAttack(__instance.MapHeld, __instance);
+        }
+    }
+
+    /// <summary>
+    /// Every shot, throw or blow of the player's side, aimed at those who capitulated or close to them, breaks the ceasefire.
+    /// Combat Extended fires through the same method.
+    /// </summary>
+    [HarmonyPatch(typeof(Verb), "TryCastNextBurstShot")]
+    public static class Patch_Verb_TryCastNextBurstShot
+    {
+        public static void Prefix(Verb __instance, LocalTargetInfo ___currentTarget)
+        {
+            Thing caster = __instance.caster;
+            if (caster == null || !caster.Spawned || caster.Faction != Faction.OfPlayer || !SurrenderMedicUtility.IsAttackVerb(__instance))
+            {
+                return;
+            }
+            SurrenderMedicUtility.Notify_PlayerAttack(caster.Map, ___currentTarget);
+        }
+    }
+
+    /// <summary>
+    /// Whatever the player hurts them with (explosions, stray bullets, fire) breaks the ceasefire too.
+    /// </summary>
+    [HarmonyPatch(typeof(Pawn), nameof(Pawn.PostApplyDamage))]
+    public static class Patch_Pawn_PostApplyDamage
+    {
+        public static void Postfix(Pawn __instance, DamageInfo dinfo)
+        {
+            if (dinfo.Instigator?.Faction == Faction.OfPlayer && __instance.Spawned && SurrenderUtility.HasCapitulated(__instance))
+            {
+                SurrenderMedicUtility.Notify_PlayerAttack(__instance.Map, __instance);
             }
         }
     }

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using RimWorld;
+using Verse.AI;
 using Verse.AI.Group;
 using RimWorld.Planet;
 using UnityEngine;
@@ -15,6 +16,7 @@ namespace OccupationAnnexation
     public class MapComponent_SiegeMorale : MapComponent
     {
         private const int EvaluateInterval = 250;
+        private const int MedicInterval = 30;
 
         public bool initialized;
         public bool capitulated;
@@ -41,7 +43,17 @@ namespace OccupationAnnexation
         /// <summary>Saves from before the list existed get it rebuilt once.</summary>
         private bool capitulatedListBuilt;
 
+        /// <summary>The last time the player shot at or near those who capitulated, or hurt one of them; -1 if never.</summary>
+        public int lastAttackTick = -1;
+
+        /// <summary>The ceasefire whose medics were already announced, so the message shows once per ceasefire.</summary>
+        private int medicsAnnouncedFor = -1;
+
+        /// <summary>Set by an attack; the medics are sent back down on the next tick, outside the shot or damage code.</summary>
+        private bool medicsInterruptPending;
+
         private readonly List<Pawn> tmpDefenders = new List<Pawn>();
+        private readonly List<Pawn> tmpPawns = new List<Pawn>();
 
         public MapComponent_SiegeMorale(Map map) : base(map)
         {
@@ -63,6 +75,8 @@ namespace OccupationAnnexation
             Scribe_Values.Look(ref prisonersTaken, "prisonersTaken", 0);
             Scribe_Collections.Look(ref capitulatedPawns, "capitulatedPawns", LookMode.Reference);
             Scribe_Values.Look(ref capitulatedListBuilt, "capitulatedListBuilt", false);
+            Scribe_Values.Look(ref lastAttackTick, "lastAttackTick", -1);
+            Scribe_Values.Look(ref medicsAnnouncedFor, "medicsAnnouncedFor", -1);
             if (Scribe.mode == LoadSaveMode.PostLoadInit)
             {
                 capitulatedPawns ??= new HashSet<Pawn>();
@@ -72,13 +86,25 @@ namespace OccupationAnnexation
 
         public override void MapComponentTick()
         {
-            if ((Find.TickManager.TicksGame + map.uniqueID) % EvaluateInterval != 0)
-            {
-                return;
-            }
+            int tick = Find.TickManager.TicksGame + map.uniqueID;
             if (capitulated)
             {
-                MaintainSurrender();
+                if (medicsInterruptPending)
+                {
+                    SendMedicsDown();
+                }
+                if (tick % MedicInterval == 0)
+                {
+                    UpdateMedics();
+                }
+                if (tick % EvaluateInterval == 0)
+                {
+                    MaintainSurrender();
+                }
+                return;
+            }
+            if (tick % EvaluateInterval != 0)
+            {
                 return;
             }
             if (!OAMod.Settings.enableCapitulation)
@@ -212,6 +238,115 @@ namespace OccupationAnnexation
                 {
                     SurrenderUtility.Resurrender(pawn);
                 }
+            }
+        }
+
+        /// <summary>
+        /// The ceasefire runs from the capitulation or from the player's last attack on those who capitulated.
+        /// </summary>
+        public int CeasefireStartTick => Mathf.Max(capitulationTick, lastAttackTick);
+
+        /// <summary>
+        /// When this pawn may get up to tend the wounded: its own 15 to 40 seconds into the current ceasefire.
+        /// </summary>
+        public int TendAllowedTick(Pawn pawn)
+        {
+            int start = CeasefireStartTick;
+            int seed = Gen.HashCombineInt(pawn.thingIDNumber, start);
+            return start + Rand.RangeInclusiveSeeded(SurrenderMedicUtility.MinCeasefireTicks, SurrenderMedicUtility.MaxCeasefireTicks, seed);
+        }
+
+        /// <summary>
+        /// The player shot at or near those who capitulated, or hurt one of them: the ceasefire starts over.
+        /// </summary>
+        public void Notify_CeasefireBroken()
+        {
+            int now = Find.TickManager.TicksGame;
+            if (lastAttackTick == now)
+            {
+                return;
+            }
+            lastAttackTick = now;
+            medicsInterruptPending = true;
+        }
+
+        /// <summary>
+        /// Everyone up tending the wounded drops their patients and lies face down again.
+        /// </summary>
+        private void SendMedicsDown()
+        {
+            medicsInterruptPending = false;
+            var medics = new List<Pawn>();
+            foreach (Pawn pawn in capitulatedPawns)
+            {
+                if (StillCapitulated(pawn) && !pawn.Downed && SurrenderUtility.IsSurrendered(pawn) && pawn.CurJobDef == JobDefOf.TendPatient)
+                {
+                    medics.Add(pawn);
+                }
+            }
+            if (medics.Count == 0)
+            {
+                return;
+            }
+            foreach (Pawn pawn in medics)
+            {
+                SurrenderMedicUtility.StowCarriedMedicine(pawn);
+                pawn.jobs.EndCurrentJob(JobCondition.InterruptForced);
+            }
+            Messages.Message("OA_MessageSurrenderedLieDown".Translate(map.Parent?.LabelCap ?? map.ToString()), new LookTargets(medics), MessageTypeDefOf.NeutralEvent);
+            OAMod.DebugLog($"Attack on the surrendered at {map}: {medics.Count} medics lie down again.");
+        }
+
+        /// <summary>
+        /// Gets up the medics whose time has come while someone needs tending, and stops those whose patient
+        /// was taken prisoner or is gone.
+        /// </summary>
+        private void UpdateMedics()
+        {
+            if (capitulatedPawns.Count == 0)
+            {
+                return;
+            }
+            int now = Find.TickManager.TicksGame;
+            tmpPawns.Clear();
+            tmpPawns.AddRange(capitulatedPawns);
+            List<Pawn> started = null;
+            foreach (Pawn pawn in tmpPawns)
+            {
+                if (!StillCapitulated(pawn) || pawn.Downed || !SurrenderUtility.IsSurrendered(pawn))
+                {
+                    continue;
+                }
+                Job job = pawn.CurJob;
+                if (job?.def == JobDefOf.TendPatient)
+                {
+                    if (!SurrenderMedicUtility.IsPatientFor(pawn, job.targetA.Pawn, needsTend: false))
+                    {
+                        pawn.jobs.EndCurrentJob(JobCondition.Incompletable);
+                    }
+                    continue;
+                }
+                if (job?.def != OA_DefOf.OA_Surrender || now < TendAllowedTick(pawn) || !SurrenderMedicUtility.CanDoctor(pawn))
+                {
+                    continue;
+                }
+                if (SurrenderMedicUtility.FindPatient(pawn) == null)
+                {
+                    continue;
+                }
+                pawn.jobs.CheckForJobOverride();
+                if (pawn.CurJobDef == JobDefOf.TendPatient)
+                {
+                    started ??= new List<Pawn>();
+                    started.Add(pawn);
+                }
+            }
+            tmpPawns.Clear();
+            if (started != null && medicsAnnouncedFor != CeasefireStartTick)
+            {
+                medicsAnnouncedFor = CeasefireStartTick;
+                Messages.Message("OA_MessageSurrenderedTending".Translate(map.Parent?.LabelCap ?? map.ToString()), new LookTargets(started), MessageTypeDefOf.NeutralEvent);
+                OAMod.DebugLog($"Ceasefire at {map}: {started.Count} surrendered medics get up to tend the wounded.");
             }
         }
 

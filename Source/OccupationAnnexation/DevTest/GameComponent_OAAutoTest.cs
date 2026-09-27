@@ -53,6 +53,17 @@ namespace OccupationAnnexation
         private static bool logHooked;
         private DateTime heartbeatTime = DateTime.MinValue;
         private int heartbeatTick;
+        private int medicPhase;
+        private int medicMark;
+        private int ceasefireStart;
+        private int tendedAtStart;
+        private int medicineGiven;
+        private int mapMedicine;
+        private bool earlyTendReported;
+        private bool shotWarmupSeen;
+        private Pawn medicPatient;
+        private Pawn shooter;
+        private List<Pawn> medics = new List<Pawn>();
 
         public GameComponent_OAAutoTest(Game game)
         {
@@ -264,6 +275,9 @@ namespace OccupationAnnexation
                     break;
                 case 18:
                     TestGettingUp();
+                    break;
+                case 19:
+                    TestMedics(now);
                     break;
                 case 20:
                     // Driven from GameComponentUpdate.
@@ -683,9 +697,6 @@ namespace OccupationAnnexation
         }
 
         /// <summary>
-        /// Vanilla clears the mind of a pawn that stops being downed. A capitulated pawn must stay surrendered.
-        /// </summary>
-        /// <summary>
         /// A leftover enemy (like Real Ruins' hostile ruin animals) is listed by the town's "enemies left" gizmo.
         /// </summary>
         private void TestShowEnemyGizmo(Map map)
@@ -702,6 +713,9 @@ namespace OccupationAnnexation
             Check(OccupiedSettlement.RemainingEnemies(map).Count == 0 && !town.GetGizmos().OfType<Command>().Any(c => c.defaultLabel == label), "'enemies left' gizmo disappears");
         }
 
+        /// <summary>
+        /// Vanilla clears the mind of a pawn that stops being downed. A capitulated pawn must stay surrendered.
+        /// </summary>
         private void TestGettingUp()
         {
             Map map = town.Map;
@@ -711,7 +725,7 @@ namespace OccupationAnnexation
             if (pawn == null)
             {
                 Note("No capitulated pawn left to test getting up; skipping");
-                Next(5);
+                Next(19);
                 return;
             }
             if (!pawn.Downed)
@@ -774,6 +788,342 @@ namespace OccupationAnnexation
             Check(SurrenderUtility.IsSurrendered(pawn), "old saves: pawns that lost the surrender lie down again");
 
             CheckReformGizmos(map, "after a downed pawn got up");
+            Next(19);
+        }
+
+        /// <summary>
+        /// Once the shooting has stopped for 15 to 40 seconds, those who surrendered and can doctor tend their wounded.
+        /// A real shot next to them sends them back down and restarts the wait; a shot elsewhere on the map does not.
+        /// </summary>
+        private void TestMedics(int now)
+        {
+            Map map = town.Map;
+            MapComponent_SiegeMorale morale = map.GetComponent<MapComponent_SiegeMorale>();
+            Pawn tending = medics.FirstOrDefault(p => p.CurJobDef == JobDefOf.TendPatient);
+            if (medicPhase == 3 || medicPhase == 4 || medicPhase == 9)
+            {
+                if (tending != null && now - ceasefireStart < SurrenderMedicUtility.MinCeasefireTicks && !earlyTendReported)
+                {
+                    earlyTendReported = true;
+                    Fail($"{tending.LabelShort} got up to tend only {now - ceasefireStart} ticks into the ceasefire");
+                }
+            }
+            switch (medicPhase)
+            {
+                case 0:
+                    SetUpMedicTest(map, morale, now);
+                    break;
+                case 1:
+                    // The shot next to a medic.
+                    if (morale.lastAttackTick >= medicMark)
+                    {
+                        Check(true, $"a shot next to those who surrendered breaks the ceasefire ({morale.lastAttackTick - medicMark} ticks after the order)");
+                        ceasefireStart = morale.lastAttackTick;
+                        medicPhase = 2;
+                    }
+                    else if (now - medicMark > 900)
+                    {
+                        Fail($"the shot next to those who surrendered was not noticed (shooter job {shooter.CurJobDef?.defName}, stance {shooter.stances.curStance?.GetType().Name})");
+                        ceasefireStart = morale.CeasefireStartTick;
+                        medicPhase = 2;
+                    }
+                    break;
+                case 2:
+                    Check(tending == null, "nobody tends right after the shot");
+                    if (!FireFarFromCapitulated(map, morale))
+                    {
+                        Fail("could not fire far from those who surrendered");
+                        medicPhase = 4;
+                        break;
+                    }
+                    medicMark = now;
+                    medicPhase = 3;
+                    break;
+                case 3:
+                    // The shot far away: wait until it has actually been fired.
+                    if (shooter.stances.curStance is Stance_Warmup)
+                    {
+                        shotWarmupSeen = true;
+                    }
+                    if (shotWarmupSeen && shooter.stances.curStance is Stance_Cooldown)
+                    {
+                        Check(morale.lastAttackTick == ceasefireStart, "a shot far from those who surrendered does not break the ceasefire");
+                        medicPhase = 4;
+                    }
+                    else if (now - medicMark > 600)
+                    {
+                        Fail($"the shot far away was never fired (shooter job {shooter.CurJobDef?.defName}, stance {shooter.stances.curStance?.GetType().Name})");
+                        medicPhase = 4;
+                    }
+                    break;
+                case 4:
+                    if (tending != null)
+                    {
+                        int delay = now - ceasefireStart;
+                        Note($"{tending.LabelShort} tends {tending.CurJob.targetA.Thing?.LabelShort} {delay} ticks ({delay / 60f:F1} s) into the ceasefire, medicine {tending.CurJob.targetB.Thing?.LabelShort ?? "none"}");
+                        Check(delay >= SurrenderMedicUtility.MinCeasefireTicks && delay <= SurrenderMedicUtility.MaxCeasefireTicks + 31, $"the first medic gets up 15-40 s after the shooting stops ({delay / 60f:F1} s)");
+                        Check(SurrenderUtility.IsSurrendered(tending) && tending.ThreatDisabled(null) && !GenHostility.IsActiveThreatToPlayer(tending), "a medic stays surrendered and is no threat");
+                        Check(tending.equipment?.Primary == null, "a medic is unarmed");
+                        Check(tending.MentalState?.InspectLine == "OA_SurrenderedTendingInspect".Translate(), "a medic's inspect line says it tends the wounded");
+                        Thing medicine = tending.CurJob.targetB.Thing;
+                        Check(medicine != null && medicine.def.IsMedicine && (tending.inventory.Contains(medicine) || tending.carryTracker.CarriedThing == medicine), "a medic uses the medicine it carries");
+                        CheckReformGizmos(map, "while those who surrendered tend their wounded");
+                        tendedAtStart = TendedWounds(morale);
+                        medicMark = now;
+                        medicPhase = 5;
+                    }
+                    else if (now - ceasefireStart > SurrenderMedicUtility.MaxCeasefireTicks + 600)
+                    {
+                        Fail("no surrendered medic tended the wounded");
+                        foreach (Pawn medic in medics)
+                        {
+                            Note($"  {medic.LabelShort}: may tend {SurrenderMedicUtility.MayTendNow(medic)}, patient {SurrenderMedicUtility.FindPatient(medic)?.LabelShort}, job {medic.CurJobDef?.defName}, downed {medic.Downed}, surrendered {SurrenderUtility.IsSurrendered(medic)}");
+                        }
+                        FinishMedicTest(map);
+                    }
+                    break;
+                case 5:
+                    if (TendedWounds(morale) > tendedAtStart)
+                    {
+                        Check(true, $"the wounded got tended ({now - medicMark} ticks, {TendedWounds(morale) - tendedAtStart} wounds; test patient still needs tending {medicPatient.health.HasHediffsNeedingTend()})");
+                        Check(MedicineWithMedics() < medicineGiven, $"the medics' own medicine gets used ({MedicineWithMedics()}/{medicineGiven} left)");
+                        Check(SpawnedMedicine(map) == mapMedicine, $"the town's own medicine is left alone ({SpawnedMedicine(map)}/{mapMedicine})");
+                        if (tending == null && !medicPatient.Dead)
+                        {
+                            // Someone must be at work for the next shot: a fresh wound (not from the player).
+                            medicPatient.TakeDamage(new DamageInfo(DamageDefOf.Cut, 3f));
+                        }
+                        medicMark = now;
+                        medicPhase = 6;
+                    }
+                    else if (now - medicMark > 5000)
+                    {
+                        Fail($"the wounded were not tended (medic job {tending?.CurJobDef?.defName} {tending?.jobs.curDriver?.CurToilString}, test patient needs tending {medicPatient.health.HasHediffsNeedingTend()})");
+                        FinishMedicTest(map);
+                    }
+                    break;
+                case 6:
+                    if (tending != null)
+                    {
+                        if (!FireNear(map, tending.Position))
+                        {
+                            Fail("could not fire next to a medic at work");
+                            FinishMedicTest(map);
+                            break;
+                        }
+                        medicPatient = tending.CurJob.targetA.Pawn ?? medicPatient;
+                        mapMedicine = SpawnedMedicine(map);
+                        Note($"Second shot while {tending.LabelShort} is at '{tending.jobs.curDriver?.CurToilString}', carrying {tending.carryTracker.CarriedThing?.LabelShort ?? "nothing"}");
+                        medicMark = now;
+                        medicPhase = 7;
+                    }
+                    else if (now - medicMark > 600)
+                    {
+                        Fail("no medic went back to work for the second shot");
+                        FinishMedicTest(map);
+                    }
+                    break;
+                case 7:
+                    if (morale.lastAttackTick >= medicMark)
+                    {
+                        ceasefireStart = morale.lastAttackTick;
+                        earlyTendReported = false;
+                        medicPhase = 8;
+                    }
+                    else if (now - medicMark > 900)
+                    {
+                        Fail("the shot next to a medic at work was not noticed");
+                        FinishMedicTest(map);
+                    }
+                    break;
+                case 8:
+                    Check(tending == null, "medics abandon the wounded when shots resume");
+                    Check(medics.Where(p => !p.Dead && !p.Downed).All(p => p.CurJobDef == OA_DefOf.OA_Surrender), "medics lie face down again");
+                    Check(medics.All(p => p.carryTracker?.CarriedThing == null), "medics are not left holding medicine");
+                    Check(SpawnedMedicine(map) == mapMedicine, $"medics pocket their medicine instead of dropping it ({SpawnedMedicine(map)}/{mapMedicine} on the ground)");
+                    medicPhase = 9;
+                    break;
+                case 9:
+                    if (tending != null && now - ceasefireStart >= SurrenderMedicUtility.MinCeasefireTicks)
+                    {
+                        Check(now - ceasefireStart <= SurrenderMedicUtility.MaxCeasefireTicks + 31, $"medics get up again 15-40 s into the new ceasefire ({(now - ceasefireStart) / 60f:F1} s)");
+                        medicPhase = 10;
+                    }
+                    else if (now - ceasefireStart > SurrenderMedicUtility.MaxCeasefireTicks + 600)
+                    {
+                        Fail("medics never got up again after the new ceasefire");
+                        FinishMedicTest(map);
+                    }
+                    break;
+                case 10:
+                    // Hurting one of them in any way counts like a shot.
+                    Pawn victim = medicPatient.Dead ? medics.First(p => !p.Dead) : medicPatient;
+                    victim.TakeDamage(new DamageInfo(DamageDefOf.Blunt, 1f, instigator: shooter));
+                    Check(morale.lastAttackTick == now, "hurting one of those who surrendered breaks the ceasefire");
+                    medicPhase = 11;
+                    break;
+                case 11:
+                    Check(tending == null, "medics lie down after one of them is hurt");
+                    FinishMedicTest(map);
+                    break;
+            }
+        }
+
+        private void SetUpMedicTest(Map map, MapComponent_SiegeMorale morale, int now)
+        {
+            List<Pawn> alive = morale.capitulatedPawns.Where(morale.StillCapitulated).ToList();
+            medics = alive.Where(p => !p.Downed && SurrenderUtility.IsSurrendered(p) && SurrenderMedicUtility.CanDoctor(p)).ToList();
+            if (medics.Count == 0)
+            {
+                Pawn candidate = alive.FirstOrDefault(p => p.Downed && !p.WorkTypeIsDisabled(WorkTypeDefOf.Doctor));
+                candidate?.health.RemoveAllHediffs();
+                medics = alive.Where(p => !p.Downed && SurrenderUtility.IsSurrendered(p) && SurrenderMedicUtility.CanDoctor(p)).ToList();
+            }
+            medicPatient = alive.Where(p => !medics.Contains(p)).OrderBy(p => p.Downed ? 0 : 1).FirstOrDefault();
+            if (medicPatient == null && medics.Count > 1)
+            {
+                medicPatient = medics.Last();
+                medics.Remove(medicPatient);
+            }
+            shooter = map.mapPawns.FreeColonistsSpawned.FirstOrDefault(p => !p.Downed && !p.InMentalState && !p.WorkTagIsDisabled(WorkTags.Violent));
+            if (medics.Count == 0 || medicPatient == null || shooter == null)
+            {
+                Note($"Cannot test the surrendered medics (medics {medics.Count}, patient {medicPatient?.LabelShort}, shooter {shooter?.LabelShort}); skipping");
+                Next(5);
+                return;
+            }
+            if (!medicPatient.Downed)
+            {
+                HealthUtility.DamageUntilDowned(medicPatient, allowBleedingWounds: true);
+            }
+            if (!medicPatient.Dead && !medicPatient.health.HasHediffsNeedingTend())
+            {
+                medicPatient.TakeDamage(new DamageInfo(DamageDefOf.Cut, 4f));
+            }
+            Check(!medicPatient.Dead && medicPatient.Downed && medicPatient.health.HasHediffsNeedingTend(), $"wounded comrade {medicPatient.LabelShort} needs tending");
+            // Settlement defenders rarely carry medicine; each medic gets some, the town's stock must stay untouched.
+            foreach (Pawn medic in medics)
+            {
+                Thing herbal = ThingMaker.MakeThing(ThingDefOf.MedicineHerbal);
+                herbal.stackCount = 3;
+                medic.inventory.innerContainer.TryAdd(herbal);
+            }
+            medicineGiven = MedicineWithMedics();
+            mapMedicine = SpawnedMedicine(map);
+            Note($"Medics: {medics.Select(p => p.LabelShort).ToCommaList()}; ceasefire so far {now - morale.CeasefireStartTick} ticks, tending already {medics.Count(p => p.CurJobDef == JobDefOf.TendPatient)}");
+
+            ThingDef gunDef = ThingDef.Named("Gun_Revolver");
+            var gun = (ThingWithComps)ThingMaker.MakeThing(gunDef, GenStuff.DefaultStuffFor(gunDef));
+            shooter.equipment.DestroyAllEquipment();
+            shooter.equipment.AddEquipment(gun);
+            Type ammoUser = AccessTools.TypeByName("CombatExtended.CompAmmoUser");
+            ThingComp ammo = ammoUser == null ? null : gun.AllComps.FirstOrDefault(c => ammoUser.IsInstanceOfType(c));
+            if (ammo != null)
+            {
+                AccessTools.Method(ammoUser, "ResetAmmoCount").Invoke(ammo, new object[] { null });
+            }
+            shooter.drafter.Drafted = true;
+
+            medicMark = now;
+            if (!medics.Any(m => FireNear(map, m.Position)))
+            {
+                Fail("could not fire next to those who surrendered");
+                FinishMedicTest(map);
+                return;
+            }
+            medicPhase = 1;
+        }
+
+        private static int TendedWounds(MapComponent_SiegeMorale morale)
+        {
+            return morale.capitulatedPawns.Where(p => !p.Dead).Sum(p => p.health.hediffSet.hediffs.Count(h => h.IsTended()));
+        }
+
+        private int MedicineWithMedics()
+        {
+            return medics.Sum(p => p.inventory.innerContainer.Where(t => t.def.IsMedicine).Sum(t => t.stackCount)
+                + (p.carryTracker.CarriedThing?.def.IsMedicine == true ? p.carryTracker.CarriedThing.stackCount : 0));
+        }
+
+        private static int SpawnedMedicine(Map map)
+        {
+            return map.listerThings.ThingsInGroup(ThingRequestGroup.Medicine).Sum(t => t.stackCount);
+        }
+
+        private bool FireNear(Map map, IntVec3 around)
+        {
+            foreach (IntVec3 cell in GenRadial.RadialCellsAround(around, 3f, useCenter: false))
+            {
+                if (cell.InBounds(map) && cell.Standable(map) && !cell.Fogged(map) && cell.GetFirstPawn(map) == null && FireAt(map, cell))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private bool FireFarFromCapitulated(Map map, MapComponent_SiegeMorale morale)
+        {
+            List<Pawn> capitulated = morale.capitulatedPawns.Where(p => p.Spawned).ToList();
+            IEnumerable<IntVec3> cells = map.AllCells
+                .Where(c => c.Standable(map) && !c.Fogged(map) && c.GetFirstPawn(map) == null && capitulated.All(p => !p.Position.InHorDistOf(c, 25f)))
+                .InRandomOrder()
+                .Take(50);
+            foreach (IntVec3 cell in cells)
+            {
+                if (FireAt(map, cell))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Puts the armed test colonist within range and orders a single burst at the cell, as the player does with "Attack".
+        /// </summary>
+        private bool FireAt(Map map, IntVec3 target)
+        {
+            Verb verb = shooter.equipment?.PrimaryEq?.PrimaryVerb;
+            if (verb == null)
+            {
+                return false;
+            }
+            foreach (IntVec3 cell in GenRadial.RadialCellsAround(target, 12f, useCenter: false))
+            {
+                if (cell.DistanceTo(target) < 5f || !cell.InBounds(map) || !cell.Standable(map) || cell.Fogged(map) || (cell.GetFirstPawn(map) != null && cell != shooter.Position))
+                {
+                    continue;
+                }
+                if (!verb.CanHitTargetFrom(cell, target))
+                {
+                    continue;
+                }
+                shooter.jobs.StopAll();
+                shooter.stances.CancelBusyStanceHard();
+                shooter.Position = cell;
+                shooter.Notify_Teleported();
+                shotWarmupSeen = false;
+                Job job = JobMaker.MakeJob(JobDefOf.AttackStatic, target);
+                job.verbToUse = verb;
+                job.maxNumStaticAttacks = 1;
+                job.playerForced = true;
+                bool ordered = shooter.jobs.TryTakeOrderedJob(job, JobTag.Misc);
+                Note($"{shooter.LabelShort} fires at {target} from {cell}: ordered {ordered}");
+                return ordered;
+            }
+            return false;
+        }
+
+        private void FinishMedicTest(Map map)
+        {
+            if (shooter != null)
+            {
+                shooter.jobs.StopAll();
+                shooter.drafter.Drafted = false;
+                shooter.equipment.DestroyAllEquipment();
+            }
+            CheckReformGizmos(map, "after the medic test");
             Next(5);
         }
 

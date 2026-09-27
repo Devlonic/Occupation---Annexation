@@ -13,6 +13,7 @@ namespace OccupationAnnexation
     {
         public static readonly Type CompSuppressableType = AccessTools.TypeByName("CombatExtended.CompSuppressable");
         public static readonly Type AmmoDefType = AccessTools.TypeByName("CombatExtended.AmmoDef");
+        public static readonly Type VerbLaunchProjectileType = AccessTools.TypeByName("CombatExtended.Verb_LaunchProjectileCE");
 
         private static readonly FieldInfo isSuppressedField;
         private static readonly MethodInfo isHunkeringGetter;
@@ -74,6 +75,11 @@ namespace OccupationAnnexation
         public static bool IsAmmo(Thing thing)
         {
             return AmmoDefType != null && AmmoDefType.IsInstanceOfType(thing.def);
+        }
+
+        public static bool IsProjectileVerb(Verb verb)
+        {
+            return VerbLaunchProjectileType != null && VerbLaunchProjectileType.IsInstanceOfType(verb);
         }
     }
 }

@@ -14,6 +14,8 @@ namespace OccupationAnnexation
 
         protected override bool CanEndBeforeMaxDurationNow => false;
 
+        public override string InspectLine => pawn.CurJobDef == JobDefOf.TendPatient ? "OA_SurrenderedTendingInspect".Translate().ToString() : base.InspectLine;
+
         public override void PostStart(string reason)
         {
             base.PostStart(reason);

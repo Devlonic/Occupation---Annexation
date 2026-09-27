@@ -11,6 +11,11 @@ surrender; occupy the town, win its loyalty, annex it, collect its taxes and vis
    and ammo and lies face down. Surrendered pawns are no threat: colonists and turrets
    ignore them. Right-click one to **take them prisoner** on the spot. Settlement
    defenders no longer panic-flee off the map (configurable).
+   Once no one has fired at them for 15–40 seconds (each medic waits a different time),
+   surrendered pawns who can doctor get up and **tend their wounded** who weren't taken
+   prisoner. They use only the medicine they carry, then lie down again. Fire at them or
+   near them, or hurt one of them, and every medic abandons the wounded, lies face down
+   and the wait starts over.
 2. **Occupation.** Instead of becoming ruins, the settlement becomes a town of your
    **Protectorate**, a single permanently allied faction created on first use. Its
    buildings and turrets switch sides. When your people leave, the survivors stay as the
@@ -70,7 +75,8 @@ The game locks the DLL while running; close it before rebuilding.
 ### Dev-mode tools
 
 - **Debug actions**, category *Occupation & Annexation*: *Force capitulation*,
-  *Log siege morale*, *Log hostile threats* (what keeps "Reform caravan" disabled).
+  *Log siege morale*, *Log hostile threats* (what keeps "Reform caravan" disabled),
+  *Log surrendered medics* (the ceasefire and when each surrendered pawn may tend).
 - **Town gizmos** with *Show dev gizmos* on: loyalty ±20, pass a day, produce 10 days,
   trigger uprising, trigger retake attempt.
 
@@ -86,6 +92,8 @@ optionally CE/CAI, and this mod. Set `autosaveIntervalDays` > 0 in its `Prefs.xm
 
 The test covers:
 - the assault, capitulation, taking a prisoner and occupation;
+- surrendered medics: the 15–40 s ceasefire, tending, real shots near them and far away,
+  and hurting one of them;
 - leaving the map, and a save/load round-trip;
 - annexing, production, caravan and drop-pod deliveries;
 - opening every window, tab and gizmo;

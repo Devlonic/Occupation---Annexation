@@ -29,10 +29,13 @@
 
 	<!-- ============ Capitulation ============ -->
 	<OA_LetterCapitulationLabel>{0} capitulates</OA_LetterCapitulationLabel>
-	<OA_LetterCapitulation>The defense of {0} is broken. The remaining defenders of {1} throw down their weapons and lie face down: {2} people have surrendered.\n\nThey will not fight anymore. You can take some of them prisoner; the rest become the population of the town once it is occupied.\n\nKilling those who surrendered will cost the town's loyalty.</OA_LetterCapitulation>
+	<OA_LetterCapitulation>The defense of {0} is broken. The remaining defenders of {1} throw down their weapons and lie face down: {2} people have surrendered.\n\nThey will not fight anymore. You can take some of them prisoner; the rest become the population of the town once it is occupied.\n\nOnce the shooting has stopped for a little while, those of them who can treat the wounded will get up and tend the wounded you have not taken prisoner. Fire at them again and they abandon the wounded and lie face down.\n\nKilling those who surrendered will cost the town's loyalty.</OA_LetterCapitulation>
 	<OA_TakePrisoner>Take {0} prisoner</OA_TakePrisoner>
 	<OA_CannotTakePrisoner>Cannot take {0} prisoner</OA_CannotTakePrisoner>
 	<OA_MessageTookPrisoner>{0} took {1} prisoner.</OA_MessageTookPrisoner>
+	<OA_MessageSurrenderedTending>The shooting has stopped: those who surrendered in {0} are tending their wounded.</OA_MessageSurrenderedTending>
+	<OA_MessageSurrenderedLieDown>Shots at those who surrendered in {0}: they abandon the wounded and lie face down again.</OA_MessageSurrenderedLieDown>
+	<OA_SurrenderedTendingInspect>Surrendered: tending the wounded, unarmed</OA_SurrenderedTendingInspect>
 
 	<!-- ============ Occupation ============ -->
 	<OA_ProtectorateName>Protectorate of {0}</OA_ProtectorateName>
