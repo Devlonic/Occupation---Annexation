@@ -55,6 +55,12 @@ namespace OccupationAnnexation
         private int heartbeatTick;
         private int medicPhase;
         private int medicSettleTick = -1;
+        private Pawn fireVictim;
+        private Pawn selfBurner;
+        private Pawn fireHelper;
+        private bool selfRolled;
+        private int fireMark;
+        private int fireAttackTick;
         private int medicMark;
         private int ceasefireStart;
         private int tendedAtStart;
@@ -1254,7 +1260,7 @@ namespace OccupationAnnexation
                     if (working != null && now - ceasefireStart >= SurrenderMedicUtility.MinCeasefireTicks)
                     {
                         Check(now - ceasefireStart <= SurrenderMedicUtility.MaxCeasefireTicks + 31, $"medics get up again 15-40 s into the new ceasefire ({(now - ceasefireStart) / 60f:F1} s)");
-                        medicPhase = 11;
+                        medicPhase = 20;
                     }
                     else if (now - ceasefireStart > SurrenderMedicUtility.MaxCeasefireTicks + 600)
                     {
@@ -1274,6 +1280,111 @@ namespace OccupationAnnexation
                     Check(working == null, "medics lie down after one of them is hurt");
                     FinishMedicTest(map);
                     break;
+                case 20:
+                    SetUpFireTest(map, morale, working, now);
+                    break;
+                case 21:
+                    WatchFireTest(map, morale, now);
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Fire before tending: the patient of a medic at work catches fire from a fire the player lit, and so does someone
+        /// on their feet. The burns must not break the ceasefire; the one on their feet rolls the fire out and someone puts
+        /// out the one on the ground.
+        /// </summary>
+        private void SetUpFireTest(Map map, MapComponent_SiegeMorale morale, Pawn working, int now)
+        {
+            // Not everyone can catch fire: someone lying in a doorway, or whose armor does not burn (Combat Extended).
+            Pawn patient = working?.CurJob.targetA.Pawn;
+            bool medicsPatient = patient != null && patient != working && patient.Spawned && patient.Downed && !patient.Dead && patient.CanEverAttachFire();
+            fireVictim = medicsPatient ? patient : morale.capitulatedPawns.FirstOrDefault(p => p.Spawned && !p.Dead && p.Downed && p.CanEverAttachFire());
+            selfBurner = morale.capitulatedPawns.Where(p => p.Spawned && !p.Dead && !p.Downed && p != working && SurrenderUtility.IsSurrendered(p) && p.CanEverAttachFire())
+                .OrderBy(p => p.CurJobDef == OA_DefOf.OA_Surrender ? 0 : 1).FirstOrDefault();
+            if (fireVictim == null)
+            {
+                Note("Nobody lies downed who can catch fire; skipping the fire test");
+                medicPhase = 11;
+                return;
+            }
+            fireAttackTick = morale.lastAttackTick;
+            fireVictim.TryAttachFire(0.5f, shooter);
+            selfBurner?.TryAttachFire(0.5f, shooter);
+            Note($"{shooter.LabelShort}'s fire: {fireVictim.LabelShort} burns on the ground ({(medicsPatient ? $"patient of {working.LabelShort} at {working.CurJobDef.defName}" : "not a patient")}), "
+                + $"{selfBurner?.LabelShort ?? "nobody"} on their feet");
+            if (!fireVictim.HasAttachment(ThingDefOf.Fire))
+            {
+                Fail($"could not set {fireVictim.LabelShort} on fire");
+                medicPhase = 11;
+                return;
+            }
+            // Someone who could tend and can fight fires (not every background allows it), close enough to help.
+            Fire fire = (Fire)fireVictim.GetAttachment(ThingDefOf.Fire);
+            Pawn medic = new[] { working }.Concat(medics).FirstOrDefault(m => m != null && m != selfBurner && !m.HasAttachment(ThingDefOf.Fire)
+                && SurrenderMedicUtility.MayTendNow(m) && SurrenderFireUtility.MayFightFiresNow(m)
+                && m.Position.InHorDistOf(fireVictim.Position, SurrenderFireUtility.MaxHelpDistance) && m.CanReach(fire, PathEndMode.Touch, Danger.Deadly));
+            if (medic != null)
+            {
+                Job next = new JobGiver_Surrendered().TryIssueJobPackage(medic, default).Job;
+                Check(next?.def == JobDefOf.BeatFire, $"a medic puts out a burning comrade before tending anyone ({medic.LabelShort}: next job {next?.def.defName})");
+            }
+            else
+            {
+                Note($"No medic who can fight fires is close enough to check the priority ({working.LabelShort} can fight fires {SurrenderFireUtility.CanFightFires(working)})");
+            }
+            Check(SurrenderMedicUtility.FindPatient(working) != fireVictim && SurrenderMedicUtility.FindWoundedToCarry(working, out _) != fireVictim,
+                "nobody bandages or carries a comrade who is burning");
+            fireHelper = null;
+            selfRolled = false;
+            fireMark = now;
+            medicPhase = 21;
+        }
+
+        private void WatchFireTest(Map map, MapComponent_SiegeMorale morale, int now)
+        {
+            if (selfBurner != null && selfBurner.CurJobDef == JobDefOf.ExtinguishSelf)
+            {
+                selfRolled = true;
+            }
+            if (fireHelper == null)
+            {
+                fireHelper = morale.capitulatedPawns.FirstOrDefault(p => p.Spawned && p.CurJobDef == JobDefOf.BeatFire);
+                if (fireHelper != null)
+                {
+                    Note($"{fireHelper.LabelShort} puts out the fire {now - fireMark} ticks after it started");
+                }
+            }
+            bool victimBurns = SurrenderFireUtility.FireOnDowned(fireVictim) != null;
+            bool selfBurns = selfBurner != null && selfBurner.Spawned && selfBurner.HasAttachment(ThingDefOf.Fire);
+            if (!victimBurns && !selfBurns)
+            {
+                Check(morale.lastAttackTick == fireAttackTick, $"burns from a fire the player lit do not break the ceasefire (last attack {morale.lastAttackTick}, was {fireAttackTick})");
+                Check(fireHelper != null, $"someone who surrendered puts out a comrade burning on the ground ({fireHelper?.LabelShort ?? "nobody"}, {now - fireMark} ticks; {fireVictim.LabelShort} {(fireVictim.Dead ? "died" : "survived")})");
+                if (selfBurner != null)
+                {
+                    Check(selfRolled, $"someone who surrendered and catches fire rolls it out on the spot ({selfBurner.LabelShort} {(selfBurner.Dead ? "died" : "survived")})");
+                }
+                Check(morale.capitulatedPawns.Where(p => p.Spawned && !p.Dead && !p.Downed).All(p => SurrenderUtility.IsSurrendered(p) && p.ThreatDisabled(null)),
+                    "those who fought the fire stay surrendered and are no threat");
+                ClearFires(map);
+                medicPhase = 11;
+            }
+            else if (now - fireMark > 2500)
+            {
+                Fail($"the fires were not put out (on the ground {victimBurns}, on their feet {selfBurns}; jobs: "
+                    + morale.capitulatedPawns.Where(p => p.Spawned && !p.Downed).Select(p => $"{p.LabelShort} {p.CurJobDef?.defName}").ToCommaList() + ")");
+                ClearFires(map);
+                medicPhase = 11;
+            }
+        }
+
+        /// <summary>Whatever the test fire spread to must not burn down the town for the rest of the run.</summary>
+        private static void ClearFires(Map map)
+        {
+            foreach (Thing fire in map.listerThings.ThingsOfDef(ThingDefOf.Fire).ToList())
+            {
+                fire.Destroy();
             }
         }
 

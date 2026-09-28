@@ -40,6 +40,7 @@
 	<OA_MessageSurrenderedTending>Стрілянина вщухла: ті, хто здався в {0}, надають допомогу своїм пораненим.</OA_MessageSurrenderedTending>
 	<OA_MessageSurrenderedLieDown>Постріли по тих, хто здався в {0}: вони кидають поранених і знову лягають обличчям донизу.</OA_MessageSurrenderedLieDown>
 	<OA_SurrenderedTendingInspect>Здався: надає допомогу пораненим, беззбройний</OA_SurrenderedTendingInspect>
+	<OA_SurrenderedFirefightingInspect>Здався: гасить вогонь, беззбройний</OA_SurrenderedFirefightingInspect>
 	<OA_MessageGoodwillKilledSurrendered>Поширюються чутки, що ваші люди вбили того, хто здався. Доброзичливість {0} з: {1}.</OA_MessageGoodwillKilledSurrendered>
 	<OA_MessageLoyaltyFromTending>Люди {0} пам'ятають, що ваші лікарі лікували їхніх поранених: лояльність +{1}.</OA_MessageLoyaltyFromTending>
 

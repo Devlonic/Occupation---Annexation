@@ -11,6 +11,11 @@ namespace OccupationAnnexation
             {
                 return null;
             }
+            Job fire = SurrenderFireUtility.TryGiveFireJob(pawn);
+            if (fire != null)
+            {
+                return fire;
+            }
             Job medic = SurrenderMedicUtility.TryGiveMedicJob(pawn);
             if (medic != null)
             {

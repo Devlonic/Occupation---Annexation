@@ -110,6 +110,7 @@ namespace OccupationAnnexation
                 }
                 if (tick % MedicInterval == 0)
                 {
+                    UpdateFirefighting();
                     UpdateMedics();
                 }
                 if (tick % EvaluateInterval == 0)
@@ -311,6 +312,72 @@ namespace OccupationAnnexation
             }
             Messages.Message("OA_MessageSurrenderedLieDown".Translate(map.Parent?.LabelCap ?? map.ToString()), new LookTargets(medics), MessageTypeDefOf.NeutralEvent);
             OAMod.DebugLog($"Attack on the surrendered at {map}: {medics.Count} medics lie down again.");
+        }
+
+        /// <summary>
+        /// Fire before tending, whatever the ceasefire: someone burning on their feet rolls it out, and the nearest one
+        /// on their feet puts out a comrade burning on the ground, leaving whatever they were doing.
+        /// </summary>
+        private void UpdateFirefighting()
+        {
+            if (capitulatedPawns.Count == 0)
+            {
+                return;
+            }
+            tmpPawns.Clear();
+            tmpPawns.AddRange(capitulatedPawns);
+            foreach (Pawn pawn in tmpPawns)
+            {
+                if (!StillCapitulated(pawn) || !pawn.Spawned)
+                {
+                    continue;
+                }
+                if (!pawn.Downed)
+                {
+                    if (SurrenderUtility.IsSurrendered(pawn) && pawn.CurJobDef != JobDefOf.ExtinguishSelf && pawn.GetAttachment(ThingDefOf.Fire) is Fire own)
+                    {
+                        SurrenderMedicUtility.StowCarriedMedicine(pawn);
+                        pawn.jobs.StartJob(JobMaker.MakeJob(JobDefOf.ExtinguishSelf, own), JobCondition.InterruptForced);
+                    }
+                    continue;
+                }
+                Fire fire = SurrenderFireUtility.FireOnDowned(pawn);
+                if (fire == null || SurrenderFireUtility.IsBeingPutOut(fire, null))
+                {
+                    continue;
+                }
+                Pawn helper = NearestFirefighter(pawn, fire);
+                if (helper != null)
+                {
+                    OAMod.DebugLog($"{helper} leaves {helper.CurJobDef?.defName} to put out the fire on {pawn}.");
+                    SurrenderMedicUtility.StowCarriedMedicine(helper);
+                    helper.jobs.StartJob(JobMaker.MakeJob(JobDefOf.BeatFire, fire), JobCondition.InterruptForced);
+                }
+            }
+            tmpPawns.Clear();
+        }
+
+        private Pawn NearestFirefighter(Pawn burning, Fire fire)
+        {
+            Pawn best = null;
+            int bestDistance = int.MaxValue;
+            foreach (Pawn pawn in capitulatedPawns)
+            {
+                if (pawn == burning || pawn.Faction != burning.Faction || SurrenderFireUtility.IsFireJob(pawn.CurJobDef)
+                    || !SurrenderFireUtility.MayFightFiresNow(pawn) || pawn.HasAttachment(ThingDefOf.Fire))
+                {
+                    continue;
+                }
+                int distance = pawn.Position.DistanceToSquared(burning.Position);
+                if (distance >= bestDistance || distance > SurrenderFireUtility.MaxHelpDistance * SurrenderFireUtility.MaxHelpDistance
+                    || !pawn.CanReach(fire, PathEndMode.Touch, Danger.Deadly))
+                {
+                    continue;
+                }
+                best = pawn;
+                bestDistance = distance;
+            }
+            return best;
         }
 
         /// <summary>

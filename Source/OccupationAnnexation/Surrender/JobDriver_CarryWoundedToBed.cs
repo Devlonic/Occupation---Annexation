@@ -47,7 +47,9 @@ namespace OccupationAnnexation
                 }
             });
 
-            yield return WatchedGoto(Toils_Goto.GotoThing(TargetIndex.A, PathEndMode.ClosestTouch).FailOnDespawnedOrNull(TargetIndex.A));
+            // Nobody picks up someone who is burning: the fire is put out first.
+            yield return WatchedGoto(Toils_Goto.GotoThing(TargetIndex.A, PathEndMode.ClosestTouch).FailOnDespawnedOrNull(TargetIndex.A)
+                .FailOn(() => SurrenderFireUtility.FireOnDowned(Takee) != null));
             yield return Toils_Haul.StartCarryThing(TargetIndex.A);
             yield return WatchedGoto(Toils_Goto.GotoThing(TargetIndex.B, PathEndMode.Touch).FailOn(() => !pawn.IsCarryingPawn(Takee)));
             // The wounded reserves the bed for themselves when they lie down in it.

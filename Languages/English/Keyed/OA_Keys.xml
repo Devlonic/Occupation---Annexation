@@ -40,6 +40,7 @@
 	<OA_MessageSurrenderedTending>The shooting has stopped: those who surrendered in {0} are tending their wounded.</OA_MessageSurrenderedTending>
 	<OA_MessageSurrenderedLieDown>Shots at those who surrendered in {0}: they abandon the wounded and lie face down again.</OA_MessageSurrenderedLieDown>
 	<OA_SurrenderedTendingInspect>Surrendered: tending the wounded, unarmed</OA_SurrenderedTendingInspect>
+	<OA_SurrenderedFirefightingInspect>Surrendered: putting out a fire, unarmed</OA_SurrenderedFirefightingInspect>
 	<OA_MessageGoodwillKilledSurrendered>Word spreads that your people killed someone who had surrendered. Goodwill {0} with: {1}.</OA_MessageGoodwillKilledSurrendered>
 	<OA_MessageLoyaltyFromTending>The people of {0} remember that your doctors treated their wounded: loyalty +{1}.</OA_MessageLoyaltyFromTending>
 

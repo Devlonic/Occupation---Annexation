@@ -30,6 +30,11 @@ More in [Media/Screenshots](Media/Screenshots). They are taken by the autotest i
    lie down again. Fire at them or near them, or hurt one of them, and every medic drops
    whoever they carry, lies face down and the wait starts over. Someone a colonist is
    coming for (to take prisoner or to tend) stays down and waits.
+   **Fire comes first**, ceasefire or not: burns get worse every second and spread, while a
+   bandage can wait. Someone who catches fire rolls it out on the spot, and the nearest one
+   on their feet drops whatever they are doing to put out a comrade burning on the ground.
+   A fire you lit earlier (incendiaries, explosions) is not a new attack: its burns neither
+   break the ceasefire nor count as killing someone who surrendered.
    - **Your doctors can tend them too**: right-click someone who surrendered, *Tend*
      (with the cheapest medicine at hand, or without). The town remembers it: +1.5
      loyalty per treatment, up to +15, when you leave.
@@ -178,7 +183,8 @@ optionally CE/CAI, and this mod. Set `autosaveIntervalDays` > 0 in its `Prefs.xm
 The test covers:
 - the assault, capitulation, taking a prisoner and occupation;
 - surrendered medics: the 15–40 s ceasefire, carrying the downed into beds, tending,
-  real shots near them and far away, and hurting one of them;
+  real shots near them and far away, hurting one of them, and a fire you lit (it keeps the
+  ceasefire, and they put it out before tending);
 - your doctor tending someone who surrendered; killing one of them (colonists'
   thoughts by their views, goodwill), sparing them;
 - leaving the map (loyalty from kills, prisoners and tending), and a save/load round-trip;

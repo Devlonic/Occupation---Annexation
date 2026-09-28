@@ -52,7 +52,7 @@ namespace OccupationAnnexation
 
     /// <summary>
     /// Universal guard: no mod (CAI 5000, CE, vanilla duties) may hand a surrendered pawn a new job,
-    /// except lying down, involuntary ones and tending the wounded during a ceasefire.
+    /// except lying down, involuntary ones, putting out fires and tending the wounded during a ceasefire.
     /// </summary>
     [HarmonyPatch(typeof(Pawn_JobTracker), nameof(Pawn_JobTracker.StartJob))]
     public static class Patch_Pawn_JobTracker_StartJob
@@ -64,7 +64,12 @@ namespace OccupationAnnexation
                 return true;
             }
             JobDef def = newJob.def;
-            if (def == OA_DefOf.OA_Surrender || def == JobDefOf.Vomit || def == JobDefOf.Wait_Downed || def == JobDefOf.Wait_MaintainPosture)
+            if (def == OA_DefOf.OA_Surrender || def == JobDefOf.Vomit || def == JobDefOf.Wait_Downed || def == JobDefOf.Wait_MaintainPosture
+                || def == JobDefOf.ExtinguishSelf)
+            {
+                return true;
+            }
+            if (def == JobDefOf.BeatFire && newJob.targetA.Thing is Fire && SurrenderFireUtility.MayFightFiresNow(___pawn))
             {
                 return true;
             }
@@ -138,6 +143,34 @@ namespace OccupationAnnexation
     }
 
     /// <summary>
+    /// Those who surrendered never plan a way through walls or locked doors: they may not break anything. CAI 5000
+    /// lets hostile pawns dig through walls, and a medic carrying the wounded stood before a town wall for good.
+    /// Runs after CAI's own prefix, which sets that mode.
+    /// </summary>
+    [HarmonyPatch(typeof(PathFinder), nameof(PathFinder.FindPath),
+        new[] { typeof(IntVec3), typeof(LocalTargetInfo), typeof(TraverseParms), typeof(PathEndMode), typeof(PathFinderCostTuning) })]
+    public static class Patch_PathFinder_FindPath
+    {
+        [HarmonyPriority(Priority.Last)]
+        public static void Prefix(ref TraverseParms traverseParms)
+        {
+            Pawn pawn = traverseParms.pawn;
+            if (pawn == null || !SurrenderUtility.IsSurrendered(pawn))
+            {
+                return;
+            }
+            TraverseMode mode = traverseParms.mode;
+            if (mode == TraverseMode.PassAllDestroyableThings || mode == TraverseMode.PassAllDestroyableThingsNotWater
+                || mode == TraverseMode.PassAllDestroyablePlayerOwnedThings)
+            {
+                traverseParms.mode = TraverseMode.ByPawn;
+            }
+            traverseParms.canBashDoors = false;
+            traverseParms.canBashFences = false;
+        }
+    }
+
+    /// <summary>
     /// A medic whose way is blocked by a colonist does not attack them (vanilla's reaction to a blocked path);
     /// it gives up that errand instead and thinks again.
     /// </summary>
@@ -174,7 +207,8 @@ namespace OccupationAnnexation
     {
         public static void Prefix(Pawn __instance, DamageInfo? dinfo)
         {
-            if (!SurrenderUtility.IsSurrendered(__instance) || dinfo?.Instigator?.Faction != Faction.OfPlayer)
+            // Burning to death in a fire left from the fight is not a killing by the player.
+            if (!SurrenderUtility.IsSurrendered(__instance) || dinfo?.Instigator?.Faction != Faction.OfPlayer || SurrenderFireUtility.DealingFireDamage)
             {
                 return;
             }
@@ -251,11 +285,62 @@ namespace OccupationAnnexation
     {
         public static void Postfix(Pawn __instance, DamageInfo dinfo)
         {
-            // MapHeld: someone being carried by a medic counts too.
-            if (dinfo.Instigator?.Faction == Faction.OfPlayer && __instance.MapHeld != null && SurrenderUtility.HasCapitulated(__instance))
+            // MapHeld: someone being carried by a medic counts too. A fire burns in the name of whoever lit it; its burns are not a new attack.
+            if (dinfo.Instigator?.Faction == Faction.OfPlayer && __instance.MapHeld != null && !SurrenderFireUtility.DealingFireDamage
+                && SurrenderUtility.HasCapitulated(__instance))
             {
                 SurrenderMedicUtility.Notify_PlayerAttack(__instance.MapHeld, __instance);
             }
+        }
+    }
+
+    /// <summary>
+    /// Marks the burns a fire deals to what stands in it (vanilla credits them to whoever lit the fire).
+    /// </summary>
+    [HarmonyPatch(typeof(Fire), "DoFireDamage")]
+    public static class Patch_Fire_DoFireDamage
+    {
+        public static void Prefix()
+        {
+            SurrenderFireUtility.fireDamageDepth++;
+        }
+
+        public static System.Exception Finalizer(System.Exception __exception)
+        {
+            SurrenderFireUtility.fireDamageDepth--;
+            return __exception;
+        }
+    }
+
+    /// <summary>
+    /// Someone who surrendered and catches fire drops and rolls it out on the spot (vanilla: one chance in ten to think
+    /// of it, otherwise running around or toward water, which the surrender forbids, so they just burned).
+    /// </summary>
+    [HarmonyPatch(typeof(JobGiver_ExtinguishSelf), "TryGiveJob")]
+    public static class Patch_JobGiver_ExtinguishSelf
+    {
+        public static bool Prefix(Pawn pawn, ref Job __result)
+        {
+            if (!SurrenderUtility.IsSurrendered(pawn) || pawn.Downed)
+            {
+                return true;
+            }
+            __result = pawn.GetAttachment(ThingDefOf.Fire) is Fire fire ? JobMaker.MakeJob(JobDefOf.ExtinguishSelf, fire) : null;
+            return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(JobGiver_JumpInWater), "TryGiveJob")]
+    public static class Patch_JobGiver_JumpInWater
+    {
+        public static bool Prefix(Pawn pawn, ref Job __result)
+        {
+            if (!SurrenderUtility.IsSurrendered(pawn))
+            {
+                return true;
+            }
+            __result = null;
+            return false;
         }
     }
 

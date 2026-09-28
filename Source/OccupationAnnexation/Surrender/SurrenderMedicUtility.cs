@@ -82,7 +82,9 @@ namespace OccupationAnnexation
             int bestDistance = int.MaxValue;
             foreach (Pawn pawn in medic.Map.mapPawns.SpawnedPawnsInFaction(medic.Faction))
             {
-                if (pawn == medic || !IsPatientFor(medic, pawn, needsTend: true) || (bleedingOnly && !(pawn.health.hediffSet.BleedRateTotal > 0f)))
+                // Someone burning is put out first, not bandaged.
+                if (pawn == medic || !IsPatientFor(medic, pawn, needsTend: true) || (bleedingOnly && !(pawn.health.hediffSet.BleedRateTotal > 0f))
+                    || SurrenderFireUtility.FireOnDowned(pawn) != null)
                 {
                     continue;
                 }
@@ -150,7 +152,8 @@ namespace OccupationAnnexation
             MapComponent_SiegeMorale morale = medic.Map.GetComponent<MapComponent_SiegeMorale>();
             foreach (Pawn pawn in medic.Map.mapPawns.SpawnedPawnsInFaction(medic.Faction))
             {
-                if (pawn == medic || !pawn.Downed || pawn.InBed() || !IsPatientFor(medic, pawn, needsTend: false) || morale?.CarryFailedRecently(pawn) == true)
+                if (pawn == medic || !pawn.Downed || pawn.InBed() || !IsPatientFor(medic, pawn, needsTend: false) || morale?.CarryFailedRecently(pawn) == true
+                    || SurrenderFireUtility.FireOnDowned(pawn) != null)
                 {
                     continue;
                 }
