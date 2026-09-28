@@ -79,13 +79,62 @@ namespace OccupationAnnexation
                 if (!lastLogged.TryGetValue(key, out int tick) || now - tick > GenDate.TicksPerHour)
                 {
                     lastLogged[key] = now;
-                    OAMod.DebugLog($"Blocked job {def.defName} for surrendered {___pawn}.");
+                    OAMod.DebugLog($"Blocked job {def.defName} ({newJob.targetA}) for surrendered {___pawn} at {___pawn.Position}, current job {___pawn.CurJobDef?.defName}.");
                 }
             }
             return false;
         }
 
         private static readonly Dictionary<int, int> lastLogged = new Dictionary<int, int>();
+    }
+
+    /// <summary>
+    /// Vanilla drops whatever a pawn holds when a job ends. A surrendered medic pockets the medicine left over after
+    /// tending instead (finish actions run before that drop).
+    /// </summary>
+    [HarmonyPatch(typeof(Pawn_JobTracker), nameof(Pawn_JobTracker.StartJob))]
+    public static class Patch_Pawn_JobTracker_StartJob_Medic
+    {
+        public static void Postfix(Pawn_JobTracker __instance, Job newJob, Pawn ___pawn)
+        {
+            if (newJob?.def == JobDefOf.TendPatient && __instance.curJob == newJob && __instance.curDriver != null && SurrenderUtility.IsSurrendered(___pawn))
+            {
+                __instance.curDriver.AddFinishAction(condition => SurrenderMedicUtility.StowCarriedMedicine(___pawn));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Vanilla treats every hostile pawn as a wall. Those who surrendered and the player's people pass each other:
+    /// a colonist standing in a doorway would otherwise stop a medic carrying the wounded for good, and someone lying
+    /// face down in a corridor would stop colonists.
+    /// </summary>
+    [HarmonyPatch(typeof(PawnUtility), nameof(PawnUtility.PawnBlockingPathAt))]
+    public static class Patch_PawnUtility_PawnBlockingPathAt
+    {
+        public static void Postfix(IntVec3 c, Pawn forPawn, ref Pawn __result)
+        {
+            if (__result == null || !PassEachOther(forPawn, __result))
+            {
+                return;
+            }
+            // Anyone else hostile in that cell still blocks.
+            List<Thing> things = c.GetThingList(forPawn.Map);
+            for (int i = 0; i < things.Count; i++)
+            {
+                if (things[i] is Pawn other && other != forPawn && other != __result && !other.Downed && other.HostileTo(forPawn) && !PassEachOther(forPawn, other))
+                {
+                    __result = other;
+                    return;
+                }
+            }
+            __result = null;
+        }
+
+        private static bool PassEachOther(Pawn a, Pawn b)
+        {
+            return (SurrenderUtility.IsSurrendered(a) && b.Faction == Faction.OfPlayer) || (SurrenderUtility.IsSurrendered(b) && a.Faction == Faction.OfPlayer);
+        }
     }
 
     /// <summary>
@@ -202,9 +251,10 @@ namespace OccupationAnnexation
     {
         public static void Postfix(Pawn __instance, DamageInfo dinfo)
         {
-            if (dinfo.Instigator?.Faction == Faction.OfPlayer && __instance.Spawned && SurrenderUtility.HasCapitulated(__instance))
+            // MapHeld: someone being carried by a medic counts too.
+            if (dinfo.Instigator?.Faction == Faction.OfPlayer && __instance.MapHeld != null && SurrenderUtility.HasCapitulated(__instance))
             {
-                SurrenderMedicUtility.Notify_PlayerAttack(__instance.Map, __instance);
+                SurrenderMedicUtility.Notify_PlayerAttack(__instance.MapHeld, __instance);
             }
         }
     }

@@ -3,6 +3,18 @@
 Enemy settlements no longer have to be wiped out. Break their defense and the survivors
 surrender; occupy the town, win its loyalty, annex it, collect its taxes and visit it.
 
+## Screenshots
+
+| | |
+|---|---|
+| ![The defense broke: the survivors lie face down, unarmed](Media/Screenshots/01_capitulation.jpg) | ![The capitulation letter](Media/Screenshots/02_capitulation_letter.jpg) |
+| ![Taking someone who surrendered prisoner](Media/Screenshots/03_take_prisoner.jpg) | ![A surrendered medic tends a wounded comrade in the town's infirmary](Media/Screenshots/04_medic_tends.jpg) |
+| ![Your doctor can tend those who surrendered](Media/Screenshots/06_tend_surrendered.jpg) | ![Colonists react to a killing of someone who surrendered](Media/Screenshots/07_thoughts.jpg) |
+| ![An annexed town: loyalty, population, housing, stockpile](Media/Screenshots/13_world_annexed.jpg) | ![Life in a visited town](Media/Screenshots/11_town_life.jpg) |
+
+More in [Media/Screenshots](Media/Screenshots). They are taken by the autotest itself
+(`-oa_screenshots=<folder>`, see below).
+
 ## Gameplay
 
 1. **Capitulation.** While you assault a hostile faction settlement, the defenders' morale
@@ -136,7 +148,8 @@ copy instead. `Tools\Build-Release.ps1` builds the DLL and copies only what the 
    choose *Upload to Steam Workshop* (*Update on Steam Workshop* later).
 3. On the first upload, Steam takes the description from `About\About.xml`. After that, edit
    the page on Steam: paste `Workshop\Description.en.bbcode`, add the Ukrainian description
-   from `Workshop\Description.uk.bbcode`, and set the visibility.
+   from `Workshop\Description.uk.bbcode`, add images from `Media\Screenshots` and set the
+   visibility.
 4. Close the game and run `.\Tools\Build-Release.ps1 -LinkForDevelopment`. It points the
    junction back at the repository and copies `About\PublishedFileId.txt`, written by the
    game on the first upload, into the repository. Commit that file; later uploads then
@@ -179,5 +192,15 @@ The test covers:
 
 It writes the PASS/FAIL report and counts every error logged during the run.
 
+With `-oa_screenshots=C:\path\shots` it also takes the Workshop screenshots. The run
+pauses at each scene, frames it, and captures it without the dev tools. In this mode
+the assault starts in the morning and the squad carries rifles, armor and food. Use a
+windowed 1600×900 test profile with the learning helper off (`adaptiveTrainingEnabled`
+False). Convert the PNGs to JPG for `Media/Screenshots`.
+
 ### Note from Devloner
 This mod was created using a LLM, so please keep that in mind if you use it.
+
+## License
+
+[MIT](LICENSE) © 2026 Devloner.

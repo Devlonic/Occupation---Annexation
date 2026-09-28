@@ -35,7 +35,8 @@ namespace OccupationAnnexation
         private List<TransferableOneWay> transferables;
         private TransferableOneWayWidget widget;
 
-        public override Vector2 InitialSize => new Vector2(1024f, UI.screenHeight - 100f);
+        /// <summary>Wide enough that the list's column header starts right of the search box.</summary>
+        public override Vector2 InitialSize => new Vector2(Mathf.Min(1100f, UI.screenWidth - 40f), UI.screenHeight - 100f);
 
         protected override float Margin => 17f;
 
@@ -141,7 +142,11 @@ namespace OccupationAnnexation
             }
 
             Rect widgetRect = new Rect(0f, titleRect.yMax + infoHeight + 4f, inRect.width, inRect.height - titleRect.height - infoHeight - ButtonSize.y - 14f);
-            widget.OnGUI(widgetRect);
+            // The widget draws its sort buttons and search box at the origin of the current group, so it gets a group of its own
+            // below the title, as in vanilla's caravan and trade windows.
+            Widgets.BeginGroup(widgetRect);
+            widget.OnGUI(new Rect(0f, 0f, widgetRect.width, widgetRect.height));
+            Widgets.EndGroup();
 
             Rect buttonsRect = new Rect(0f, inRect.height - ButtonSize.y, inRect.width, ButtonSize.y);
             DrawButtons(buttonsRect);

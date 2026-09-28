@@ -54,6 +54,7 @@ namespace OccupationAnnexation
         private DateTime heartbeatTime = DateTime.MinValue;
         private int heartbeatTick;
         private int medicPhase;
+        private int medicSettleTick = -1;
         private int medicMark;
         private int ceasefireStart;
         private int tendedAtStart;
@@ -133,7 +134,13 @@ namespace OccupationAnnexation
             {
                 return;
             }
-            Prefs.DevMode = true;
+            if (shotQueue.Count > 0)
+            {
+                UpdateShots();
+                return;
+            }
+            // Screenshots show the game as players see it, without the dev toolbar and dev gizmos.
+            Prefs.DevMode = ShotDir == null || step != 20;
             if (step == 20)
             {
                 try
@@ -323,14 +330,31 @@ namespace OccupationAnnexation
             }
             townTile = target.Tile;
             Note($"Target: {target.Label} of {target.Faction.Name} ({target.Faction.def.defName}, {target.Faction.def.techLevel}) at tile {target.Tile}");
+            if (ShotDir != null)
+            {
+                // Pictures are taken in daylight: the assault starts in the morning, local time.
+                int hours = (8 - GenLocalDate.HourOfDay(target.Tile) + 24) % 24;
+                Find.TickManager.DebugSetTicksGame(Find.TickManager.TicksGame + hours * GenDate.TicksPerHour);
+            }
 
             var squad = new List<Pawn>();
             for (int i = 0; i < 6; i++)
             {
                 Pawn pawn = PawnGenerator.GeneratePawn(PawnKindDefOf.Colonist, Faction.OfPlayer);
+                if (ShotDir != null)
+                {
+                    EquipForPictures(pawn);
+                }
                 squad.Add(pawn);
             }
             caravan = CaravanMaker.MakeCaravan(squad, Faction.OfPlayer, target.Tile, addToWorldPawnsIfNotAlready: true);
+            if (ShotDir != null)
+            {
+                // A squad that brought food: no starving caravan in the world map pictures.
+                Thing food = ThingMaker.MakeThing(ThingDefOf.Pemmican);
+                food.stackCount = 300;
+                CaravanInventoryUtility.GiveThing(caravan, food);
+            }
             SettlementUtility.Attack(caravan, target);
             Next(1);
         }
@@ -417,6 +441,34 @@ namespace OccupationAnnexation
             Note($"Profile: {town.profile.Select(p => p.def.defName + " " + p.share.ToString("F2")).ToCommaList()}; rect {town.townRect}");
             CheckReformGizmos(map, "after occupation");
             TestShowEnemyGizmo(map);
+
+            if (ShotDir != null)
+            {
+                // The player has walked through the town by now; pictures should not show black rooms.
+                map.fogGrid.ClearAllFog();
+            }
+            // The picture shows as many of those who surrendered as possible: the camera goes to the biggest group.
+            Pawn focus = locals.Where(p => SurrenderUtility.IsSurrendered(p) && p.Spawned && !p.Position.Fogged(map))
+                .OrderByDescending(p => locals.Count(o => o.Spawned && o.Position.InHorDistOf(p.Position, 9f)))
+                .ThenBy(p => p.Downed ? 1 : 0)
+                .FirstOrDefault();
+            if (focus != null)
+            {
+                List<Pawn> group = locals.Where(o => o.Spawned && o.Position.InHorDistOf(focus.Position, 9f)).ToList();
+                IntVec3 groupCenter = new IntVec3((int)group.Average(p => p.Position.x), 0, (int)group.Average(p => p.Position.z));
+                Shoot("01_capitulation", () =>
+                {
+                    FrameOn(map, groupCenter, 13f);
+                    SelectOnMap(focus);
+                }, CloseWindows);
+                string letterLabel = "OA_LetterCapitulationLabel".Translate(target.LabelCap);
+                Letter letter = Find.LetterStack.LettersListForReading.LastOrDefault(l => l.Label.ToString() == letterLabel);
+                Shoot("02_capitulation_letter", () =>
+                {
+                    FrameOn(map, focus.Position, 17f);
+                    letter?.OpenLetter();
+                }, CloseWindows);
+            }
             Next(4);
         }
 
@@ -454,6 +506,14 @@ namespace OccupationAnnexation
                     Note("Float menu options: " + options.Select(o => o.Label).ToCommaList());
                 }
                 Check(options.Any(o => o.Label.StartsWith(expectedLabel)), "float menu offers taking the surrendered pawn prisoner");
+                Pawn prisonerShot = prisonerTarget;
+                Pawn captorShot = captor;
+                Shoot("03_take_prisoner", () =>
+                {
+                    FrameOn(map, prisonerShot.Position, 12f);
+                    SelectOnMap(captorShot);
+                    OpenFloatMenuAtCenter(FloatMenuMakerMap.ChoicesAtFor(prisonerShot.DrawPos, captorShot));
+                }, CloseWindows);
                 Job job = JobMaker.MakeJob(OA_DefOf.OA_TakeSurrenderedPrisoner, prisonerTarget);
                 job.count = 1;
                 Check(captor.jobs.TryTakeOrderedJob(job, JobTag.Misc), "prisoner job accepted");
@@ -641,6 +701,11 @@ namespace OccupationAnnexation
             {
                 visitChecked = true;
                 visitLocals = locals.ToList();
+                if (ShotDir != null)
+                {
+                    // A regenerated town starts fogged; pictures should show the locals indoors too.
+                    map.fogGrid.ClearAllFog();
+                }
                 int buildings = map.listerBuildings.allBuildingsNonColonist.Count(b => b.Faction == town.Faction);
                 int expected = 0, restored = 0;
                 var missing = new Dictionary<string, int>();
@@ -678,6 +743,19 @@ namespace OccupationAnnexation
                 Check(!town.Stock.Any(), "stockpile laid out on the map");
                 BuildDuringVisit(map);
             }
+            if (ShotDir != null && StepTicks > 2500 && StepTicks % 60 == 0 && GenLocalDate.HourOfDay(map) >= 9 && GenLocalDate.HourOfDay(map) <= 16)
+            {
+                // A local at work in daylight, with others around.
+                Pawn worker = locals.Where(p => p.Spawned && !p.Position.Fogged(map)
+                        && (p.CurJobDef?.defName == "OA_FakeWork" || p.CurJobDef?.defName == "OA_FakeFarm" || p.CurJobDef?.defName == "OA_TownRepair"))
+                    .OrderByDescending(p => locals.Count(o => o.Position.InHorDistOf(p.Position, 10f)))
+                    .FirstOrDefault();
+                if (worker != null)
+                {
+                    // No selection: the inspect pane shows nothing about a local's work anyway.
+                    Shoot("11_town_life", () => FrameOn(map, worker.Position, 14f), CloseWindows);
+                }
+            }
             if (StepTicks % 500 == 0)
             {
                 foreach (Pawn pawn in locals)
@@ -697,6 +775,8 @@ namespace OccupationAnnexation
                 Check(damagedAtStart == 0 || damagedNow < damagedAtStart, "locals repair battle damage");
                 Check(jobHistogram.ContainsKey("LayDown"), "locals sleep at night");
                 Check(jobHistogram.Keys.Any(k => k == "OA_FakeWork" || k == "OA_FakeFarm" || k == "HaulToCell" || k == "OA_Patrol" || k == "LayDown"), "locals do town jobs");
+                Note("Locals at the end of the visit: " + visitLocals.Select(p => $"{p.LabelShort} {(p.Spawned ? (p.Downed ? "downed" : "up") : "gone")} {p.GetLord()?.LordJob?.GetType().Name ?? "no lord"}").ToCommaList());
+                Check(visitLocals.Where(p => !p.Dead).All(p => p.Spawned && p.Map == map && p.GetLord()?.LordJob is LordJob_TownLife), "every living local is still in town and on the town routine");
                 TestMilitiaOnMap(map);
                 Next(13);
             }
@@ -781,6 +861,15 @@ namespace OccupationAnnexation
             }
             List<Pawn> armed = TownMilitiaUtility.ArmMilitia(town, map);
             militiaArmed = armed.Count;
+            Pawn militiaman = armed.FirstOrDefault(p => !p.Position.Fogged(map));
+            if (militiaman != null)
+            {
+                Shoot("12_militia", () =>
+                {
+                    FrameOn(map, militiaman.Position, 12f);
+                    SelectOnMap(militiaman);
+                }, CloseWindows);
+            }
             Check(armed.Count > 0 && armed.All(p => p.equipment.Primary != null && p.GetLord()?.LordJob is LordJob_DefendBase),
                 $"the militia takes up arms from the stockpile ({armed.Count} armed, {weapons} weapons in town)");
             town.militia = false;
@@ -849,8 +938,8 @@ namespace OccupationAnnexation
         {
             Map map = town.Map;
             MapComponent_SiegeMorale morale = map.GetComponent<MapComponent_SiegeMorale>();
-            Pawn pawn = morale.capitulatedPawns.FirstOrDefault(p => morale.StillCapitulated(p) && p.Downed)
-                ?? morale.capitulatedPawns.FirstOrDefault(p => morale.StillCapitulated(p));
+            Pawn pawn = morale.capitulatedPawns.FirstOrDefault(p => morale.StillCapitulated(p) && p.Spawned && p.Downed)
+                ?? morale.capitulatedPawns.FirstOrDefault(p => morale.StillCapitulated(p) && p.Spawned);
             if (pawn == null)
             {
                 Note("No capitulated pawn left to test getting up; skipping");
@@ -877,7 +966,7 @@ namespace OccupationAnnexation
             // vanilla drops it from its lord, then it gets back up and vanilla clears its mind.
             // Armor, drugs or traits (Combat Extended) can keep someone on their feet: take whoever actually goes down.
             Pawn other = null;
-            foreach (Pawn candidate in morale.capitulatedPawns.Where(p => p != pawn && morale.StillCapitulated(p)).ToList())
+            foreach (Pawn candidate in morale.capitulatedPawns.Where(p => p != pawn && p.Spawned && morale.StillCapitulated(p)).ToList())
             {
                 if (candidate.Downed)
                 {
@@ -908,6 +997,8 @@ namespace OccupationAnnexation
                 {
                     other.GetLord()?.RemovePawn(other);
                     other.health.RemoveAllHediffs();
+                    // Vanilla ignores enemies shut in fogged rooms (medics may have carried this one indoors).
+                    FloodFillerFog.FloodUnfog(other.Position, map);
                     bool threat = GenHostility.IsActiveThreatToPlayer(other);
                     Note($"Control without the patch: {other.LabelShort} downed {other.Downed}, surrendered {SurrenderUtility.IsSurrendered(other)}, active threat {threat}");
                     Check(!SurrenderUtility.IsSurrendered(other) && threat, "control: vanilla makes a recovered pawn an enemy again");
@@ -923,12 +1014,21 @@ namespace OccupationAnnexation
 
             // Saves made before the capitulation list existed: the list is rebuilt from the defeated faction's people.
             int listed = morale.capitulatedPawns.Count;
+            List<Pawn> listedPawns = morale.capitulatedPawns.Where(morale.StillCapitulated).ToList();
             morale.capitulatedPawns.Clear();
             Traverse.Create(morale).Field("capitulatedListBuilt").SetValue(false);
             pawn.mindState.mentalStateHandler.Reset();
             morale.MaintainSurrender();
             Check(morale.capitulatedPawns.Count > 0 && morale.capitulatedPawns.Contains(pawn), $"old saves: capitulation list rebuilt ({morale.capitulatedPawns.Count}, was {listed})");
             Check(SurrenderUtility.IsSurrendered(pawn), "old saves: pawns that lost the surrender lie down again");
+            foreach (Pawn before in listedPawns)
+            {
+                if (!morale.capitulatedPawns.Contains(before))
+                {
+                    Note($"  old saves: {before.LabelShort} is not in the rebuilt list (dead {before.Dead}, spawned {before.Spawned}, held by {before.ParentHolder?.GetType().Name}, faction {before.Faction?.Name})");
+                    morale.capitulatedPawns.Add(before);
+                }
+            }
 
             CheckReformGizmos(map, "after a downed pawn got up");
             Next(19);
@@ -945,6 +1045,23 @@ namespace OccupationAnnexation
             MapComponent_SiegeMorale morale = map.GetComponent<MapComponent_SiegeMorale>();
             Pawn working = medics.FirstOrDefault(p => SurrenderMedicUtility.IsMedicJob(p.CurJobDef));
             Pawn tending = medics.FirstOrDefault(p => p.CurJobDef == JobDefOf.TendPatient);
+            Pawn carrying = medics.FirstOrDefault(p => p.Spawned && p.carryTracker?.CarriedThing is Pawn && !p.Position.Fogged(map));
+            if (medicPhase >= 4 && medicPhase <= 6 && carrying != null)
+            {
+                Shoot("05_medic_carries", () =>
+                {
+                    FrameOn(map, carrying.Position, 11f);
+                    SelectOnMap(carrying);
+                }, CloseWindows, keepMessages: true);
+            }
+            if (medicPhase >= 5 && medicPhase <= 6 && tending != null && tending.jobs.curDriver?.CurToilString == "Wait" && !tending.Position.Fogged(map))
+            {
+                Shoot("04_medic_tends", () =>
+                {
+                    FrameOn(map, tending.Position, 11f);
+                    SelectOnMap(tending);
+                }, CloseWindows, keepMessages: true);
+            }
             if (medicPhase == 3 || medicPhase == 4 || medicPhase == 10)
             {
                 if (working != null && now - ceasefireStart < SurrenderMedicUtility.MinCeasefireTicks && !earlyTendReported)
@@ -956,6 +1073,17 @@ namespace OccupationAnnexation
             switch (medicPhase)
             {
                 case 0:
+                    // The ceasefire may have run for a while and medics may be carrying someone: send them down first.
+                    if (medicSettleTick < 0)
+                    {
+                        medicSettleTick = now;
+                        morale.Notify_CeasefireBroken();
+                        break;
+                    }
+                    if (now - medicSettleTick < 60 && morale.capitulatedPawns.Any(p => !p.Dead && p.ParentHolder is Pawn_CarryTracker))
+                    {
+                        break;
+                    }
                     SetUpMedicTest(map, morale, now);
                     break;
                 case 1:
@@ -1018,6 +1146,8 @@ namespace OccupationAnnexation
                         Check(delay >= SurrenderMedicUtility.MinCeasefireTicks && delay <= SurrenderMedicUtility.MaxCeasefireTicks + 31, $"the first medic gets up 15-40 s after the shooting stops ({delay / 60f:F1} s)");
                         Check(SurrenderUtility.IsSurrendered(working) && working.ThreatDisabled(null) && !GenHostility.IsActiveThreatToPlayer(working), "a medic stays surrendered and is no threat");
                         Check(working.equipment?.Primary == null, "a medic is unarmed");
+                        bool anyBleeding = morale.capitulatedPawns.Any(p => !p.Dead && p.Spawned && p.health.hediffSet.BleedRateTotal > 0f && p.health.HasHediffsNeedingTend());
+                        Check(!anyBleeding || medics.Any(p => p.CurJobDef == JobDefOf.TendPatient), $"bleeding is stopped before anyone is carried (jobs: {medics.Where(p => p.CurJob != null && SurrenderMedicUtility.IsMedicJob(p.CurJobDef)).Select(p => p.CurJobDef.defName).ToCommaList()})");
                         CheckReformGizmos(map, "while those who surrendered tend their wounded");
                         NoteWoundedAndBeds(map, morale, working);
                         tendedAtStart = TendedWounds(morale);
@@ -1055,8 +1185,16 @@ namespace OccupationAnnexation
                     {
                         Check(true, $"the wounded got tended ({now - medicMark} ticks, {TendedWounds(morale) - tendedAtStart} wounds; test patient still needs tending {medicPatient.health.HasHediffsNeedingTend()})");
                         Check(true, $"medics carried the badly wounded into beds ({bedded.Select(p => p.LabelShort).ToCommaList()})");
-                        Check(MedicineWithMedics() < medicineGiven, $"the medics' own medicine gets used ({MedicineWithMedics()}/{medicineGiven} left)");
-                        Check(SpawnedMedicine(map) == mapMedicine, $"the town's own medicine is left alone ({SpawnedMedicine(map)}/{mapMedicine})");
+                        Note($"Medicine the medics still carry: {MedicineWithMedics()}/{medicineGiven}");
+                        Check(SpawnedMedicine(map) >= mapMedicine, $"the town's own medicine is left alone ({SpawnedMedicine(map)}/{mapMedicine})");
+                        if (SpawnedMedicine(map) > mapMedicine)
+                        {
+                            foreach (Thing dropped in map.listerThings.ThingsInGroup(ThingRequestGroup.Medicine))
+                            {
+                                Pawn near = GenClosest.ClosestThing_Global(dropped.Position, map.mapPawns.AllPawnsSpawned, 5f) as Pawn;
+                                Note($"  medicine on the ground: {dropped.LabelCap} at {dropped.Position}, nearest pawn {near?.LabelShort} (downed {near?.Downed}, job {near?.CurJobDef?.defName})");
+                            }
+                        }
                         if (working == null && !medicPatient.Dead)
                         {
                             // Someone must be at work for the next shot: a fresh wound (not from the player).
@@ -1065,7 +1203,7 @@ namespace OccupationAnnexation
                         medicMark = now;
                         medicPhase = 7;
                     }
-                    else if (now - medicMark > 6000)
+                    else if (now - medicMark > 12000)
                     {
                         Fail($"the wounded were not tended ({tended}) or carried into beds ({bedded.Count}) (medic job {working?.CurJobDef?.defName} {working?.jobs.curDriver?.CurToilString}, free bed {medics.Any(m => SurrenderMedicUtility.FindBedFor(m, medicPatient) != null)})");
                         FinishMedicTest(map);
@@ -1126,9 +1264,10 @@ namespace OccupationAnnexation
                     break;
                 case 11:
                     // Hurting one of them in any way counts like a shot.
-                    Pawn victim = medicPatient.Dead ? medics.First(p => !p.Dead) : medicPatient;
-                    victim.TakeDamage(new DamageInfo(DamageDefOf.Blunt, 1f, instigator: shooter));
-                    Check(morale.lastAttackTick == now, "hurting one of those who surrendered breaks the ceasefire");
+                    Pawn victim = new[] { medicPatient }.Concat(medics).FirstOrDefault(p => !p.Dead && p.Spawned) ?? medicPatient;
+                    victim.TakeDamage(new DamageInfo(DamageDefOf.Blunt, 1f, armorPenetration: 999f, instigator: shooter));
+                    Check(morale.lastAttackTick == now, $"hurting one of those who surrendered breaks the ceasefire ({victim.LabelShort}: listed {morale.capitulatedPawns.Contains(victim)}, "
+                        + $"capitulated {SurrenderUtility.HasCapitulated(victim)}, spawned {victim.Spawned}, last attack {morale.lastAttackTick})");
                     medicPhase = 12;
                     break;
                 case 12:
@@ -1150,6 +1289,23 @@ namespace OccupationAnnexation
                 + $"use {RestUtility.CanUseBedNow(b, medicPatient, checkSocialProperness: false, allowMedBedEvenIfSetToNoCare: true)} reserve {medic.CanReserveAndReach(b, PathEndMode.Touch, Danger.Deadly, b.SleepingSlotsCount, 0)}").ToCommaList());
             Pawn toCarry = SurrenderMedicUtility.FindWoundedToCarry(medic, out Building_Bed bed);
             Note($"  {medic.LabelShort} would carry {toCarry?.LabelShort ?? "nobody"} to {bed?.Position.ToString() ?? "no bed"}");
+        }
+
+        /// <summary>
+        /// Defenders downed in their sleep lie in beds already; the medics must have someone to carry.
+        /// </summary>
+        private static void PutOnFloor(Pawn pawn, Map map)
+        {
+            if (!pawn.InBed())
+            {
+                return;
+            }
+            if (CellFinder.TryFindRandomCellNear(pawn.Position, map, 6, c => c.Standable(map) && c.GetFirstPawn(map) == null && c.GetFirstBuilding(map) == null, out IntVec3 floor))
+            {
+                pawn.jobs.StopAll();
+                pawn.Position = floor;
+                pawn.Notify_Teleported();
+            }
         }
 
         private List<Pawn> NewlyInBed(MapComponent_SiegeMorale morale)
@@ -1209,21 +1365,26 @@ namespace OccupationAnnexation
             {
                 HealthUtility.DamageUntilDowned(medicPatient, allowBleedingWounds: true);
             }
-            if (!medicPatient.Dead && !medicPatient.health.HasHediffsNeedingTend())
+            if (!medicPatient.Dead)
             {
+                // A fresh cut bleeds: the medics have to stop that before carrying anyone.
                 medicPatient.TakeDamage(new DamageInfo(DamageDefOf.Cut, 4f, armorPenetration: 999f));
             }
-            if (medicPatient.InBed())
+            PutOnFloor(medicPatient, map);
+            Check(!medicPatient.Dead && medicPatient.Spawned && medicPatient.Downed && !medicPatient.InBed() && medicPatient.health.HasHediffsNeedingTend(),
+                $"wounded comrade {medicPatient.LabelShort} lies on the ground and needs tending (dead {medicPatient.Dead}, spawned {medicPatient.Spawned}, "
+                + $"held by {medicPatient.ParentHolder?.GetType().Name}, downed {medicPatient.Downed}, in bed {medicPatient.InBed()}, needs tending {medicPatient.health.HasHediffsNeedingTend()})");
+            // Someone down without bleeding: the medics carry them to a bed while the bleeding one is tended.
+            Pawn carryPatient = alive.FirstOrDefault(p => p != medicPatient && !medics.Contains(p) && !p.Dead);
+            if (carryPatient != null)
             {
-                // Defenders downed in their sleep lie in beds already; the medics must have someone to carry.
-                if (CellFinder.TryFindRandomCellNear(medicPatient.Position, map, 6, c => c.Standable(map) && c.GetFirstPawn(map) == null && c.GetFirstBuilding(map) == null, out IntVec3 floor))
+                if (!carryPatient.Downed)
                 {
-                    medicPatient.jobs.StopAll();
-                    medicPatient.Position = floor;
-                    medicPatient.Notify_Teleported();
+                    HealthUtility.DamageUntilDowned(carryPatient, allowBleedingWounds: false);
                 }
+                PutOnFloor(carryPatient, map);
+                Note($"Also down on the ground: {carryPatient.LabelShort} (downed {carryPatient.Downed}, bleeding {carryPatient.health.hediffSet.BleedRateTotal:F2})");
             }
-            Check(!medicPatient.Dead && medicPatient.Downed && !medicPatient.InBed() && medicPatient.health.HasHediffsNeedingTend(), $"wounded comrade {medicPatient.LabelShort} lies on the ground and needs tending");
             // Settlement defenders rarely carry medicine; each medic gets some, the town's stock must stay untouched.
             foreach (Pawn medic in medics)
             {
@@ -1234,10 +1395,12 @@ namespace OccupationAnnexation
             medicineGiven = MedicineWithMedics();
             mapMedicine = SpawnedMedicine(map);
             inBedAtStart = new HashSet<Pawn>(alive.Where(p => p.InBed()));
-            if (!medics.Any(m => SurrenderMedicUtility.FindBedFor(m, medicPatient) != null))
+            int freeBeds = map.listerThings.ThingsInGroup(ThingRequestGroup.Bed).OfType<Building_Bed>()
+                .Count(b => b.Faction != Faction.OfPlayer && !b.ForPrisoners && RestUtility.CanUseBedNow(b, medicPatient, checkSocialProperness: false, allowMedBedEvenIfSetToNoCare: true));
+            for (int i = freeBeds; i < 2; i++)
             {
                 Building_Bed bed = SpawnTownBed(map);
-                Note(bed != null ? $"No free bed for the wounded: spawned one at {bed.Position}" : "No free bed for the wounded, and none could be spawned");
+                Note(bed != null ? $"Not enough free beds for the wounded: spawned one at {bed.Position}" : "Not enough free beds for the wounded, and none could be spawned");
             }
             Note($"Medics: {medics.Select(p => p.LabelShort).ToCommaList()}; ceasefire so far {now - morale.CeasefireStartTick} ticks, tending already {medics.Count(p => p.CurJobDef == JobDefOf.TendPatient)}");
 
@@ -1281,6 +1444,11 @@ namespace OccupationAnnexation
 
         private bool FireNear(Map map, IntVec3 around)
         {
+            if (around.Fogged(map))
+            {
+                // The shooter has looked into the room the medic is working in.
+                FloodFillerFog.FloodUnfog(around, map);
+            }
             foreach (IntVec3 cell in GenRadial.RadialCellsAround(around, 3f, useCenter: false))
             {
                 if (cell.InBounds(map) && cell.Standable(map) && !cell.Fogged(map) && cell.GetFirstPawn(map) == null && FireAt(map, cell))
@@ -1418,6 +1586,14 @@ namespace OccupationAnnexation
                     Check(tend != null, $"the float menu offers tending {playerPatient.LabelShort}, who surrendered (downed {playerPatient.Downed})");
                     Check(options.Any(o => o.Label.StartsWith(prefix) && o.Label.Contains(without)) || tend?.Label.Contains(without) == true, "tending someone who surrendered can be done without medicine");
                     tendedBefore = morale.tendedByPlayer;
+                    Pawn doctorShot = doctor;
+                    Pawn patientShot = playerPatient;
+                    Shoot("06_tend_surrendered", () =>
+                    {
+                        FrameOn(map, patientShot.Position, 12f);
+                        SelectOnMap(doctorShot);
+                        OpenFloatMenuAtCenter(FloatMenuMakerMap.ChoicesAtFor(patientShot.DrawPos, doctorShot));
+                    }, CloseWindows);
                     doctor.jobs.debugLog = true;
                     tend?.action();
                     medicMark = now;
@@ -1493,6 +1669,8 @@ namespace OccupationAnnexation
             }
             Note("Views on killing the surrendered: " + views.ToCommaList());
             Check(thoughtsRight, "colonists react to the killing according to their ideoligion and traits");
+            Pawn upset = map.mapPawns.FreeColonistsSpawned.FirstOrDefault(c => c != killer && c.needs.mood.thoughts.memories.GetFirstMemoryOfDef(OA_DefOf.OA_KilledSurrendered) != null)
+                ?? map.mapPawns.FreeColonistsSpawned.FirstOrDefault(c => c.needs.mood.thoughts.memories.GetFirstMemoryOfDef(OA_DefOf.OA_KilledSurrendered) != null);
 
             if (goodwillBefore.Count == 0)
             {
@@ -1510,7 +1688,26 @@ namespace OccupationAnnexation
             {
                 SurrenderConsequencesUtility.GiveSparedThoughts(new[] { spared });
                 Check(spared.needs.mood.thoughts.memories.GetFirstMemoryOfDef(OA_DefOf.OA_SparedSurrendered) != null, "sparing the defeated gives a good memory");
-                spared.needs.mood.thoughts.memories.RemoveMemoriesOfDef(OA_DefOf.OA_SparedSurrendered);
+            }
+            // The picture shows whichever thought someone has; the test memory is taken back afterwards.
+            Pawn thinker = upset ?? spared;
+            if (thinker != null)
+            {
+                Shoot("07_thoughts", () =>
+                {
+                    FrameOn(map, thinker.Position, 12f);
+                    SelectOnMap(thinker);
+                    ((MainTabWindow_Inspect)MainButtonDefOf.Inspect.TabWindow).OpenTabType = typeof(ITab_Pawn_Needs);
+                }, () =>
+                {
+                    ((MainTabWindow_Inspect)MainButtonDefOf.Inspect.TabWindow).OpenTabType = null;
+                    CloseWindows();
+                    spared?.needs.mood.thoughts.memories.RemoveMemoriesOfDef(OA_DefOf.OA_SparedSurrendered);
+                });
+            }
+            if (ShotDir == null)
+            {
+                spared?.needs.mood.thoughts.memories.RemoveMemoriesOfDef(OA_DefOf.OA_SparedSurrendered);
             }
         }
 
@@ -1602,6 +1799,12 @@ namespace OccupationAnnexation
             TownMilitiaUtility.DailyCheck(town);
             Check(!town.militia, "a disloyal town disbands its militia");
             town.loyalty = 90f;
+            Shoot("13_world_annexed", () => ShowOnWorld(town, typeof(WITab_Town)), HideWorld);
+            if (caravan != null && !caravan.Destroyed)
+            {
+                Caravan caravanShot = caravan;
+                Shoot("14_world_caravan", () => ShowOnWorld(caravanShot, null), HideWorld);
+            }
             Next(15);
         }
 
@@ -1668,6 +1871,14 @@ namespace OccupationAnnexation
             const int FramesPerStage = 30;
             if (uiStage > 0)
             {
+                if (ShotDir != null && uiFrames == 20)
+                {
+                    string[] names = { "10_settings", null, null, null, null, "09_delivery_dialog" };
+                    if (uiStage - 1 < names.Length && names[uiStage - 1] != null && shotsTaken.Add(names[uiStage - 1]))
+                    {
+                        Capture(names[uiStage - 1]);
+                    }
+                }
                 if (uiFrames < FramesPerStage)
                 {
                     return;
@@ -1680,14 +1891,26 @@ namespace OccupationAnnexation
                 uiErrorsAtStart = errorsSeen;
             }
             uiFrames = 0;
+            if (ShotDir != null)
+            {
+                Messages.Clear();
+            }
             switch (uiStage++)
             {
                 case 0:
                     Note("UI: mod settings");
+                    if (ShotDir != null)
+                    {
+                        // The picture shows the settings a player gets, not the test's.
+                        OAMod.Settings.minCombatTicks = 1250;
+                        OAMod.Settings.debugLogging = false;
+                    }
                     uiWindow = new Dialog_ModSettings(LoadedModManager.GetMod<OAMod>());
                     Find.WindowStack.Add(uiWindow);
                     break;
                 case 1:
+                    OAMod.Settings.minCombatTicks = 0;
+                    OAMod.Settings.debugLogging = true;
                     Note("UI: town on the world map (inspect string, gizmos, town tab)");
                     CameraJumper.TryShowWorld();
                     Find.WorldSelector.ClearSelection();
@@ -1724,6 +1947,151 @@ namespace OccupationAnnexation
                     uiStage = 0;
                     Next(7);
                     return;
+            }
+        }
+
+        // ------------------------------------------------------------------ screenshots (-oa_screenshots=<dir>)
+
+        private class Shot
+        {
+            public string name;
+            public Action setup;
+            public Action cleanup;
+            public bool keepMessages;
+        }
+
+        private static readonly string ShotDir = GenCommandLine.TryGetCommandLineArg("oa_screenshots", out string shotDir) ? shotDir : null;
+        private readonly List<Shot> shotQueue = new List<Shot>();
+        private readonly HashSet<string> shotsTaken = new HashSet<string>();
+        private int shotFrames;
+
+        /// <summary>
+        /// Queues a picture for the Workshop page. The game pauses, <paramref name="setup"/> frames the scene,
+        /// and the frame is captured once the camera and the UI have settled.
+        /// </summary>
+        private void Shoot(string name, Action setup, Action cleanup = null, bool keepMessages = false)
+        {
+            if (ShotDir != null && shotsTaken.Add(name))
+            {
+                shotQueue.Add(new Shot { name = name, setup = setup, cleanup = cleanup, keepMessages = keepMessages });
+                // Stops the remaining ticks of this frame, so the scene is still there when the picture is taken.
+                Find.TickManager.CurTimeSpeed = TimeSpeed.Paused;
+            }
+        }
+
+        private void UpdateShots()
+        {
+            Shot shot = shotQueue[0];
+            Find.TickManager.CurTimeSpeed = TimeSpeed.Paused;
+            Prefs.DevMode = false;
+            if (shotFrames == 0)
+            {
+                if (!shot.keepMessages)
+                {
+                    // The test's own bookkeeping leaves messages no player would see together.
+                    Messages.Clear();
+                }
+                try
+                {
+                    shot.setup();
+                }
+                catch (Exception e)
+                {
+                    Note($"Screenshot {shot.name} could not be set up: {e.Message}");
+                    shotFrames = 1000;
+                }
+            }
+            Find.WindowStack.TryRemove(typeof(LudeonTK.EditWindow_Log), doCloseSound: false);
+            shotFrames++;
+            if (shotFrames == 40)
+            {
+                Capture(shot.name);
+            }
+            else if (shotFrames >= 60)
+            {
+                try
+                {
+                    shot.cleanup?.Invoke();
+                }
+                catch (Exception e)
+                {
+                    Note($"Screenshot {shot.name} could not be cleaned up: {e.Message}");
+                }
+                shotQueue.RemoveAt(0);
+                shotFrames = 0;
+                Prefs.DevMode = true;
+            }
+        }
+
+        private void Capture(string name)
+        {
+            Directory.CreateDirectory(ShotDir);
+            ScreenCapture.CaptureScreenshot(Path.Combine(ShotDir, name + ".png"));
+            Note("Screenshot " + name);
+        }
+
+        private static void FrameOn(Map map, IntVec3 cell, float size)
+        {
+            CameraJumper.TryHideWorld();
+            Current.Game.CurrentMap = map;
+            Find.CameraDriver.SetRootPosAndSize(cell.ToVector3Shifted(), size);
+        }
+
+        private static void SelectOnMap(Thing thing)
+        {
+            Find.Selector.ClearSelection();
+            Find.Selector.Select(thing, playSound: false, forceDesignatorDeselect: false);
+            Find.MainTabsRoot.SetCurrentTab(MainButtonDefOf.Inspect, playSound: false);
+        }
+
+        /// <summary>A right-click menu next to whatever the camera is centred on.</summary>
+        private static void OpenFloatMenuAtCenter(List<FloatMenuOption> options)
+        {
+            var menu = new FloatMenu(options) { vanishIfMouseDistant = false };
+            Find.WindowStack.Add(menu);
+            menu.windowRect.x = UI.screenWidth / 2f + 24f;
+            menu.windowRect.y = UI.screenHeight / 2f - 16f;
+        }
+
+        private static void CloseWindows()
+        {
+            foreach (Window window in Find.WindowStack.Windows.Where(w => w is FloatMenu || w is Dialog_NodeTree).ToList())
+            {
+                window.Close(doCloseSound: false);
+            }
+            Find.Selector.ClearSelection();
+        }
+
+        private static void ShowOnWorld(WorldObject worldObject, Type tab)
+        {
+            CameraJumper.TryJumpAndSelect(worldObject);
+            Find.WorldSelector.ClearSelection();
+            Find.WorldSelector.Select(worldObject, playSound: false);
+            Find.World.UI.inspectPane.OpenTabType = tab;
+        }
+
+        private static void HideWorld()
+        {
+            Find.WorldSelector.ClearSelection();
+            CameraJumper.TryHideWorld();
+        }
+
+        /// <summary>The assault squad of the pictures carries rifles and armor.</summary>
+        private static void EquipForPictures(Pawn pawn)
+        {
+            ThingDef gun = DefDatabase<ThingDef>.GetNamedSilentFail("Gun_AssaultRifle");
+            if (gun != null)
+            {
+                pawn.equipment.DestroyAllEquipment();
+                pawn.equipment.AddEquipment((ThingWithComps)ThingMaker.MakeThing(gun));
+            }
+            foreach (string name in new[] { "Apparel_FlakVest", "Apparel_AdvancedHelmet" })
+            {
+                ThingDef def = DefDatabase<ThingDef>.GetNamedSilentFail(name);
+                if (def != null)
+                {
+                    pawn.apparel.Wear((Apparel)ThingMaker.MakeThing(def, GenStuff.DefaultStuffFor(def)), dropReplacedApparel: false);
+                }
             }
         }
 

@@ -408,7 +408,8 @@ namespace OccupationAnnexation
             {
                 return;
             }
-            foreach (Pawn pawn in map.mapPawns.SpawnedPawnsInFaction(town.originalFaction))
+            // Not only the spawned ones: someone may be carried to a bed right now.
+            foreach (Pawn pawn in map.mapPawns.PawnsInFaction(town.originalFaction))
             {
                 if (pawn.RaceProps.Humanlike && StillCapitulated(pawn))
                 {

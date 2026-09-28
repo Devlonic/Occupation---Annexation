@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using RimWorld;
 using Verse;
 using Verse.AI;
@@ -29,6 +30,15 @@ namespace OccupationAnnexation
 
         public override bool CanBlockHostileVisitors => false;
 
+        /// <summary>
+        /// Vanilla drops pawns from their lord when they go down. A local without a lord who gets back up
+        /// behaves like a stray visitor and walks off the map, and the town loses them.
+        /// </summary>
+        public override bool ShouldRemovePawn(Pawn p, PawnLostCondition reason)
+        {
+            return reason != PawnLostCondition.Incapped;
+        }
+
         public override StateGraph CreateGraph()
         {
             var graph = new StateGraph();
@@ -52,10 +62,35 @@ namespace OccupationAnnexation
 
         public override bool AllowSatisfyLongNeeds => false;
 
+        private const int AdoptInterval = 250;
+
         public override void LordToilTick()
         {
             base.LordToilTick();
+            if (lord.ticksInToil % AdoptInterval == 0)
+            {
+                AdoptStrayLocals();
+            }
             if (lord.ticksInToil % ReassignInterval == 0)
+            {
+                UpdateAllDuties();
+            }
+        }
+
+        /// <summary>
+        /// Any local of the town left without a lord (for whatever reason) rejoins the routine instead of leaving the map.
+        /// </summary>
+        private void AdoptStrayLocals()
+        {
+            List<Pawn> strays = lord.Map.mapPawns.SpawnedPawnsInFaction(lord.faction)
+                .Where(p => p.RaceProps.Humanlike && p.GetLord() == null && !p.IsPrisoner)
+                .ToList();
+            foreach (Pawn pawn in strays)
+            {
+                lord.AddPawn(pawn);
+                OAMod.DebugLog($"{pawn} had no lord on its town map and rejoins the town routine.");
+            }
+            if (strays.Count > 0)
             {
                 UpdateAllDuties();
             }

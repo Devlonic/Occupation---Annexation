@@ -28,7 +28,7 @@ $ErrorActionPreference = "Stop"
 $repo = Split-Path -Parent $PSScriptRoot
 $release = Join-Path $repo "Release\OccupationAnnexation"
 $junction = Join-Path $GameModsDir "OccupationAnnexation"
-$content = @("About", "1.5", "Defs", "Languages", "Patches", "Textures", "LoadFolders.xml")
+$content = @("About", "1.5", "Defs", "Languages", "Patches", "Textures", "LoadFolders.xml", "LICENSE")
 
 function Save-PublishedFileId {
     $released = Join-Path $release "About\PublishedFileId.txt"
